@@ -1,36 +1,43 @@
-STRINGS = GLOBAL.STRINGS
-
-local defaultPhrase = STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS
-STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "WTF WAS THAT!!"
-
 local Vector3 = GLOBAL.Vector3
 
-
-
+-- Table is as follows
+-- enabled: is this a valid prefab to use (DLC restrictions or config file)
+-- RoG: Is this a Reign of Giants only mob? 
+-- prefab: prefab name
+-- mobMult: multiplier compared to normal hound values
+-- timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
 local MOB_LIST =
 {
-    "merm",
-    "hound",
-    "tallbird",
-    "pigman", -- add tag "guard" to make guardian pigman
-    "spider" -- add spider warriors and probably more
+    [1] = {enabled=true,RoG=false,prefab="hound",mobMult=1,timeMult=1},
+    [2] = {enabled=true,RoG=false,prefab="merm",mobMult=1,timeMult=1},
+    [3] = {enabled=true,RoG=false,prefab="tallbird",mobMult=1,timeMult=1.2},
+    [4] = {enabled=true,RoG=false,prefab="pigman",mobMult=1,timeMult=1},
+    [5] = {enabled=true,RoG=false,prefab="spider",mobMult=2.5,timeMult=.5},
+    [6] = {enabled=true,RoG=false,prefab="killerbee",mobMult=3,timeMult=.25},
+    [7] = {enabled=true,RoG=false,prefab="mosquito",mobMult=3,timeMult=.25},
+    [8] = {enabled=true,RoG=true,prefab="lightninggoat",mobMult=1,timeMult=1},
 }
 
-local function getRandomMob()
-    -- pick a number from 0 to MOB_LIST.getn
-    count = 0
-    for k in pairs(MOB_LIST) do
-        count = count + 1
-    end
+-- Check the config file and the DLC to disable some of the mobs
+local function disableMobs()
+    local dlcEnabled = GLOBAL.IsDLCEnabled(GLOBAL.REIGN_OF_GIANTS)
     
-    mob = MOB_LIST[math.random(1,count-1)]
-
-    return mob
+    -- TODO: Add config file
+    for k,v in pairs(MOB_LIST) do
+        if not dlcEnabled and v.RoG then
+            print("Disabling RoG mob: " .. v.prefab)
+            MOB_LIST[k].enabled = false
+        end
+    end
 end
-
-
-
-local function updateWarningString(prefab)
+disableMobs()
+---------------------------------------------------------------------
+-- Update strings
+STRINGS = GLOBAL.STRINGS
+local defaultPhrase = STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS
+STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "WTF WAS THAT!!"
+local function updateWarningString(index)
+    prefab = MOB_LIST[index].prefab
     print("Updating warning strings for: " .. prefab)
     if prefab == nil then
         STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = defaultPhrase
@@ -42,15 +49,51 @@ local function updateWarningString(prefab)
         STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Sounds like a murder...of tall birds"
     elseif prefab == "pigman" then
         STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Was that an oink?"
+    elseif prefab == "killerbee" then
+        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Buzzzzzzzz? Buzzzzzzzzzzzz!"
     else
         STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = defaultPhrase
     end
-    
 end
+---------------------------------------------------------------------
+
+local function getRandomMob()
+    -- Generate a shuffled list from 1 to #MOB_LIST
+    local t={}
+    for i=1,#MOB_LIST do
+        t[i]=i
+    end
+    
+    for i = 1, #MOB_LIST do
+        local j=math.random(i,#MOB_LIST)
+        t[i],t[j]=t[j],t[i]
+    end
+    
+    -- Return the first one that is enabled
+    for k,v in pairs(t) do
+        if MOB_LIST[v].enabled then
+            return MOB_LIST[v].prefab, v
+        end
+    end
+
+    -- If we are here...there is NOTHING in the list enabled.
+    -- This is strange. Just return hound I guess (even though
+    -- hound is in the list and the user disabled it...)
+    return MOB_LIST[1].prefab,1
+
+    --local index = math.random(1,#MOB_LIST)
+    --mob = MOB_LIST[index]  
+    --return mob.prefab, index
+end
+
+
+
+
 
 --local currentPrefab = getRandomMob()
 local currentPrefab = "pigman"
-updateWarningString(currentPrefab)
+local currentIndex = 4
+updateWarningString(currentIndex)
 
 local function transformThings(inst)
 
@@ -81,15 +124,14 @@ end
 local function releaseRandomMobs(self)
 
 	local function ReleasePrefab(dt)
-        
 		local pt = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
 		local spawn_pt = self:GetSpawnPoint(pt)
 
-        if currentPrefab == nil then
+        if currentIndex == nil then
             -- Next wave hasn't been planned
-            prefab = getRandomMob()
+            prefab,index = getRandomMob()
         else 
-            prefab = currentPrefab
+            prefab = MOB_LIST[currentIndex].prefab
         end
         
         print("HERE COMES A " .. prefab)
@@ -166,20 +208,27 @@ local function releaseRandomMobs(self)
         origPlanFunction(self)
         -- Set the next type of mob
         print("Planning next attack...")
-        currentPrefab = getRandomMob()
+        currentPrefab, currentIndex = getRandomMob()
         print("Picked " .. currentPrefab .. " as next mob")
-        updateWarningString(currentPrefab)
+        self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[currentIndex].mobMult)
+        print("Number scheduled to be released: " .. self.houndstorelease)
+        updateWarningString(currentIndex)
     end
     
     self.PlanNextHoundAttack = planNextAttack
     
-    self.PrintCurrentMob = function()
-        if currentPrefab ~= nil then
-            print(currentPrefab)
-        else
-            print("none")
+    local origOnUpdate = self.OnUpdate
+    local function newOnUpdate(self,dt)
+        origOnUpdate(self,dt)
+        -- Modify the next release time based on the current prefab
+        if self.timetoattack <= 0 then
+            if MOB_LIST[currentIndex].timeMult ~= 1 then
+                local orig = self.timetonexthound
+                self.timetonexthound = self.timetonexthound * MOB_LIST[currentIndex].timeMult
+            end
         end
     end
+    self.OnUpdate = newOnUpdate
 
 end
 AddComponentPostInit("hounded",releaseRandomMobs)
