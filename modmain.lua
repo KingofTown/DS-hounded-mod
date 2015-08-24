@@ -1,4 +1,5 @@
 local Vector3 = GLOBAL.Vector3
+local dlcEnabled = GLOBAL.IsDLCEnabled(GLOBAL.REIGN_OF_GIANTS)
 
 -- Table is as follows
 -- enabled: is this a valid prefab to use (DLC restrictions or config file)
@@ -14,13 +15,13 @@ local MOB_LIST =
     [4] = {enabled=true,RoG=false,prefab="pigman",mobMult=1,timeMult=1},
     [5] = {enabled=true,RoG=false,prefab="spider",mobMult=2.5,timeMult=.5},
     [6] = {enabled=true,RoG=false,prefab="killerbee",mobMult=3,timeMult=.25},
-    [7] = {enabled=true,RoG=false,prefab="mosquito",mobMult=3,timeMult=.25},
-    [8] = {enabled=true,RoG=true,prefab="lightninggoat",mobMult=1,timeMult=1},
+    [7] = {enabled=true,RoG=false,prefab="mosquito",mobMult=3,timeMult=.25}, 
+    [8] = {enabled=true,RoG=true,prefab="lightninggoat",mobMult=1,timeMult=1}, 
+    [9] = {enabled=true,RoG=false,prefab="beefalo",mobMult=1,timeMult=1},
 }
 
 -- Check the config file and the DLC to disable some of the mobs
 local function disableMobs()
-    local dlcEnabled = GLOBAL.IsDLCEnabled(GLOBAL.REIGN_OF_GIANTS)
     
     -- TODO: Add config file
     for k,v in pairs(MOB_LIST) do
@@ -72,14 +73,14 @@ local function getRandomMob()
     -- Return the first one that is enabled
     for k,v in pairs(t) do
         if MOB_LIST[v].enabled then
-            return MOB_LIST[v].prefab, v
+            return v
         end
     end
 
     -- If we are here...there is NOTHING in the list enabled.
     -- This is strange. Just return hound I guess (even though
     -- hound is in the list and the user disabled it...)
-    return MOB_LIST[1].prefab,1
+    return 1
 
     --local index = math.random(1,#MOB_LIST)
     --mob = MOB_LIST[index]  
@@ -88,11 +89,7 @@ end
 
 
 
-
-
---local currentPrefab = getRandomMob()
-local currentPrefab = "pigman"
-local currentIndex = 4
+local currentIndex = 8
 updateWarningString(currentIndex)
 
 local function transformThings(inst)
@@ -152,6 +149,9 @@ local function releaseRandomMobs(self)
 			local theMob = GLOBAL.SpawnPrefab(prefab)
 			if theMob then
             
+                -- We've modified the mobs brains to be mindless killers with this tag
+                theMob:AddTag("houndedKiller")
+                
                 -- If spiders...give a chance at warrior spiders
                 if theMob == "spider" and math.random() < .5 then
                     theMob = "spider_warrior"
@@ -179,6 +179,11 @@ local function releaseRandomMobs(self)
                     theMob:AddTag("SpecialPigman")
                 end
                 
+                if theMob.components.herdmember then
+                    print("Making this thing no longer a member of a herd")
+                    theMob:RemoveComponent("herdmember")
+                end
+                
                 
 				
 				-- Override the default KeepTarget for this prefab so it never stops
@@ -191,7 +196,8 @@ local function releaseRandomMobs(self)
 				
 				theMob.Physics:Teleport(spawn_pt:Get())
 				theMob:FacePoint(pt)
-				theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+				--theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+                theMob.components.combat:SetTarget(GLOBAL.GetPlayer())
                 
                 if self.houndstorelease == 0 and theMob:HasTag("SpecialPigman") then
                     self.inst:DoTaskInTime(5, function(inst) transformThings() end)
@@ -208,8 +214,8 @@ local function releaseRandomMobs(self)
         origPlanFunction(self)
         -- Set the next type of mob
         print("Planning next attack...")
-        currentPrefab, currentIndex = getRandomMob()
-        print("Picked " .. currentPrefab .. " as next mob")
+        currentIndex = getRandomMob()
+        print("Picked " .. MOB_LIST[currentIndex].prefab .. " as next mob")
         self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[currentIndex].mobMult)
         print("Number scheduled to be released: " .. self.houndstorelease)
         updateWarningString(currentIndex)
@@ -258,3 +264,56 @@ local function AddPigmanTransformEvent(inst)
 end
 
 AddPrefabPostInit("pigman",AddPigmanTransformEvent)
+
+----------------------
+
+--require "behaviours/chaseandattack"
+local ipairs = GLOBAL.ipairs
+local function MakeMobChasePlayer(brain)
+    -- Make this the top of the priority node. Basically, if they have the insane tag (we add it above), they will
+    -- prioritize chasing and attempting to kill the player before doing normal things.
+    
+    local function KillKillDieDie(inst)
+        print("CHAARRRRGE")
+        return GLOBAL.ChaseAndAttack(inst,100)
+    end
+    
+    --for i,node in ipairs(brain.bt.root.children) do
+    --    print("\t"..node.name.." > "..(node.children and node.children[1].name or ""))
+    --end
+    
+    chaseAndKill = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Kill Kill", KillKillDieDie(brain.inst))
+    --chaseAndKill = WhileNode(function() return self.inst:HasTag("houndedKiller") end , "Kill Kill", ChaseAndAttack(self.inst, 100))
+    
+    -- Find the root node. Insert this WhileNode at the top.
+    -- Well, we'll put it after "OnFire" (if it exists) so it will still panic if on fire
+    local fireindex = 0
+    for i,node in ipairs(brain.bt.root.children) do
+        if node.name == "Parallel" and node.children[1].name == "OnFire" then
+            fireindex = i
+            break
+        end
+    end
+    
+    print("Inserting chaseAndKill to brain at priority " .. fireindex+1)
+    
+    -- If it wasn't found, it will be 0. Thus, inserting at 1 will be the first thing
+    table.insert(brain.bt.root.children, fireindex+1, chaseAndKill)
+    
+    -- Did it work?!?
+    --for i,node in ipairs(brain.bt.root.children) do
+    --    print("\t"..node.name.." > "..(node.children and node.children[1].name or ""))
+    --end
+    
+end
+
+if dlcEnabled then
+    AddBrainPostInit("lightninggoatbrain",MakeMobChasePlayer)
+end
+AddBrainPostInit("pigbrain",MakeMobChasePlayer)
+AddBrainPostInit("mermbrain",MakeMobChasePlayer)
+AddBrainPostInit("tallbirdbrain",MakeMobChasePlayer)
+AddBrainPostInit("mosquitobrain",MakeMobChasePlayer)
+AddBrainPostInit("killerbeebrain",MakeMobChasePlayer)
+AddBrainPostInit("spiderbrain",MakeMobChasePlayer)
+AddBrainPostInit("beefalobrain",MakeMobChasePlayer)
