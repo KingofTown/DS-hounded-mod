@@ -23,12 +23,12 @@ local MOB_LIST =
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
     [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.2,timeMult=.3}, 
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.5,timeMult=.15}, 
     [8]  = {enabled=true,RoG=true,prefab="lightninggoat",brain="lightninggoatbrain",mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
-    [10] = {enabled=true,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1}, --TODO, they don't seem to want to attack...
-    [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, --TODO, what is with these dudes...
-    [12] = {enabled=false,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1}, -- they don't want to keep on target :(
+    [10] = {enabled=true,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1},
+    [11] = {enabled=true,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, 
+    [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1}, 
 }
 
 -- This is for debugging. Set to random when launching the game.
@@ -276,6 +276,14 @@ local function releaseRandomMobs(self)
                     
                 end
                 
+                -- Mosquitos should have a random fill rate instead of all being at 0
+                if theMob:HasTag("mosquito") then
+                    local fillUp = math.random(0,2)
+                    for i=0,fillUp do
+                        theMob:PushEvent("onattackother",{data=theMob})
+                    end
+                end
+                
                 -- Pigs might transform! Hmm, beardbunny dudes are werebeasts too
                 if theMob.components.werebeast ~= nil then
                     theMob:AddTag("SpecialPigman")
@@ -307,13 +315,13 @@ local function releaseRandomMobs(self)
 				theMob.components.combat:SetKeepTargetFunction(keepTargetOverride)
                 
                 -- If the player is alive...go kill them
-                local function retargetOverride(inst)
-                    target = GLOBAL.GetPlayer()
-                    if inst.components.combat:CanTarget(target) then
-                        return target
-                    end
-                end
-                theMob.components.combat:SetRetargetFunction(3, retargetOverride)
+                --local function retargetOverride(inst)
+                --    target = GLOBAL.GetPlayer()
+                --    if inst.components.combat:CanTarget(target) then
+                --        return target
+                --    end
+                --end
+                --theMob.components.combat:SetRetargetFunction(3, retargetOverride)
 				
 				theMob.Physics:Teleport(spawn_pt:Get())
 				theMob:FacePoint(pt)
@@ -368,8 +376,6 @@ local function releaseRandomMobs(self)
         if self.timetoattack <= 0 then
             if MOB_LIST[self.currentIndex].timeMult ~= 1 and self.calcNextReleaseTime then
                 local orig = self.timetonexthound
-                print("self.timetonexthound: " .. tostring(self.timetonexthound))
-                print("timeMult: " .. tostring(MOB_LIST[self.currentIndex].timeMult))
                 self.timetonexthound = self.timetonexthound * MOB_LIST[self.currentIndex].timeMult
                 self.calcNextReleaseTime = false
             end
