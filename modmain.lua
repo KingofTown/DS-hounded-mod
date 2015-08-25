@@ -58,28 +58,37 @@ STRINGS = GLOBAL.STRINGS
 local defaultPhrase = STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS
 STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "WTF WAS THAT!!"
 local function updateWarningString(index)
+
+    if GLOBAL.GetPlayer() == nil then
+        return 
+    end
+    
+    character = string.upper(GLOBAL.GetPlayer().prefab)
+    if character == nil or character == "WILSON" then
+        character = "GENERIC"
+    end
+    
     prefab = MOB_LIST[index].prefab
-    print("Updating warning strings for: " .. prefab)
     if prefab == nil then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = defaultPhrase
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     elseif prefab == "merm" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Oh god, it smells like rotting fish"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh god, it smells like rotting fish"
     elseif prefab == "spider" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Sounds like a million tiny legs getting closer and closer"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a million tiny legs getting closer and closer"
     elseif prefab == "tallbird" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Sounds like a murder...of tall birds"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a murder...of tall birds"
     elseif prefab == "pigman" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Was that an oink?"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Was that an oink?"
     elseif prefab == "killerbee" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Beeeeeeeeeeeeeeeeees!"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Beeeeeeeeeeeeeeeeees!"
     elseif prefab == "mosquito" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "I hear a million teeny tiny vampires"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "I hear a million teeny tiny vampires"
     elseif prefab == "lightninggoat" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Those giant dark clouds look ominous"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Those giant dark clouds look ominous"
     elseif prefab == "beefalo" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Earthquake? It's getting louder..."
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Earthquake? It's getting louder..."
     else
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = defaultPhrase
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
 end
 ---------------------------------------------------------------------
@@ -137,10 +146,6 @@ local function getRandomMob()
     --return mob.prefab, index
 end
 
-
-
-
-updateWarningString(currentIndex)
 
 --
 local function transformThings(inst)
@@ -471,3 +476,6 @@ for k,v in pairs(MOB_LIST) do
         AddBrainPostInit(v.brain,MakeMobChasePlayer)
     end
 end
+
+-- TODO: 
+AddSimPostInit(function() GLOBAL.GetWorld().components.hounded:PlanNextHoundAttack() end)
