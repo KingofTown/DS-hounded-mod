@@ -11,10 +11,6 @@ local dlcEnabled = GLOBAL.IsDLCEnabled(GLOBAL.REIGN_OF_GIANTS)
         mobMult: multiplier compared to normal hound values (how many to release)
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
         
-        TODO: 
-        What else to add? Could put the string in the table, but then each character would be forced to have the same one.
-        
-        
 --]]
 
 local MOB_LIST =
@@ -23,11 +19,11 @@ local MOB_LIST =
     [2]  = {enabled=true,prefab="merm",brain="mermbrain",mobMult=1,timeMult=1},
     [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=1,timeMult=1.2},
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
-    [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=2.5,timeMult=.5},
-    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=3,timeMult=.4},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=3,timeMult=.4}, 
+    [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=2.2,timeMult=.5},
+    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.5,timeMult=.4},
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.5,timeMult=.4}, 
     [8]  = {enabled=true,RoG=true,prefab="lightninggoat",brain="lightninggoatbrain",mobMult=1,timeMult=1}, 
-    [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=1,timeMult=1},
+    [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=1,timeMult=1.5},
     [10] = {enabled=false,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1}, --TODO, they don't seem to want to attack...
     [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, --TODO, what is with these dudes...
     [12] = {enabled=false,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1}, -- they don't want to keep on target :(
@@ -172,36 +168,33 @@ local function releaseRandomMobs(self)
     -- Hounded is a quaker now! muahaha
     self.quakeMachine = GLOBAL.CreateEntity()
     self.quakeMachine.persists = true
-    self.quakeMachine:AddComponent("quaker")
     self.quakeMachine.entity:AddSoundEmitter()
-    self.quakeMachine.components.quaker.soundIntensity = 0.01
+    self.quakeMachine.soundIntensity = 0.01
     
     -- Override the quake functions to only shake camera and play/stop the madness
-    local function stampedeShake(self, duration)
-        self.emittingsound = true
+    local function stampedeShake(self, duration, speed, scale)
                              -- type,duration,speed,maxshake,maxdist
-        GLOBAL.TheCamera:Shake("FULL", duration, 0.02, .015, 80)
-        self.inst.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
-        self.inst.SoundEmitter:SetParameter("earthquake", "intensity", self.soundIntensity)
+        GLOBAL.TheCamera:Shake("FULL", duration, speed, scale, 80)
+        -- Increase the intensity for the next call
+        self.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
+        self.SoundEmitter:SetParameter("earthquake", "intensity", self.soundIntensity)
         
     end
-    self.quakeMachine.components.quaker.WarnQuake = stampedeShake
+    self.quakeMachine.WarnQuake = stampedeShake
     
     local function endStampedeShake(self)
         self.quake = false
         self.emittingsound = false
-        self.inst.SoundEmitter:KillSound("earthquake")
+        self.SoundEmitter:KillSound("earthquake")
         self.soundIntensity = 0.01
     end
-    self.quakeMachine.components.quaker.EndQuake = endStampedeShake
-    
-    self.quakeMachine.componnets.quaker.OnUpdate = function() end
+    self.quakeMachine.EndQuake = endStampedeShake
     
     local function makeLouder(self)
         self.soundIntensity = self.soundIntensity + .04
-        self.inst.SoundEmitter:SetParameter("earthquake","intensity",self.soundIntensity)
+        self.SoundEmitter:SetParameter("earthquake","intensity",self.soundIntensity)
     end
-    self.quakeMachine.components.quaker.MakeStampedeLouder = makeLouder
+    self.quakeMachine.MakeStampedeLouder = makeLouder
     
     self.quakeStarted = false
     
@@ -217,7 +210,7 @@ local function releaseRandomMobs(self)
             prefab = MOB_LIST[currentIndex].prefab
         end
         
-        print("HERE COMES A " .. prefab)
+        --print("HERE COMES A " .. prefab)
 		
 		if spawn_pt then
             -- TODO: Add a counter to the different mob types to modify how many come
@@ -350,8 +343,7 @@ local function releaseRandomMobs(self)
             end
             
             if self.quakeStarted then
-                print("Ending quake")
-                self.quakeMachine.components.quaker:EndQuake()
+                self.quakeMachine:EndQuake()
                 self.quakeStarted = false
             end
         end
@@ -362,13 +354,20 @@ local function releaseRandomMobs(self)
 
                 local quakeTime = 4*(self.houndstorelease+1) + self.timetoattack
                 print("Starting quake for " .. tostring(quakeTime) .. " seconds")
-                self.quakeMachine.components.quaker:WarnQuake(quakeTime)
+                
+                local interval = self.timetoattack / 2
+
+                self.quakeMachine:DoTaskInTime(0, function(self) self:WarnQuake(interval*2, .015, .1) end)
+                self.quakeMachine:DoTaskInTime(1*interval, function(self) self:WarnQuake(interval*2, .02, .1) end)
+                self.quakeMachine:DoTaskInTime(2*interval, function(self) self:WarnQuake(interval*2, .025, .1) end)
+
+                --self.quakeMachine:WarnQuake(quakeTime)
                 self.quakeStarted = true
                 
                 -- Schedule volume increases. Want at least 10 of them
                 local interval = self.timetoattack/10
                 for i=1, 10 do
-                    self.quakeMachine:DoTaskInTime(i*interval, function(self) self.components.quaker:MakeStampedeLouder() end)
+                    self.quakeMachine:DoTaskInTime(i*interval, function(self) self:MakeStampedeLouder() end)
                 end
             end
         end
