@@ -35,12 +35,18 @@ local currentIndex = 9
 -- Check the config file and the DLC to disable some of the mobs
 local function disableMobs()
     
-    -- TODO: Add config file
     for k,v in pairs(MOB_LIST) do
         if not dlcEnabled and v.RoG then
             print("Disabling RoG mob: " .. v.prefab)
             MOB_LIST[k].enabled = false
         end
+        -- Get the config data for it
+        local enabled = GetModConfigData(v.prefab)
+        if enabled == "off" then
+            print("Disabling " .. v.prefab .. " due to config setting")
+            MOB_LIST[k].enabled = false
+        end
+        
     end
 end
 disableMobs()
