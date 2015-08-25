@@ -75,7 +75,7 @@ local function updateWarningString(index)
     elseif prefab == "lightninggoat" then
         STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Those giant dark clouds look ominous"
     elseif prefab == "beefalo" then
-        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Earthquake?!"
+        STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "Earthquake? It's getting louder..."
     else
         STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = defaultPhrase
     end
@@ -180,7 +180,7 @@ local function releaseRandomMobs(self)
     local function stampedeShake(self, duration)
         self.emittingsound = true
                              -- type,duration,speed,maxshake,maxdist
-        GLOBAL.TheCamera:Shake("FULL", duration, 0.02, .1, 40)
+        GLOBAL.TheCamera:Shake("FULL", duration, 0.02, .015, 80)
         self.inst.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
         self.inst.SoundEmitter:SetParameter("earthquake", "intensity", self.soundIntensity)
         
@@ -195,8 +195,9 @@ local function releaseRandomMobs(self)
     end
     self.quakeMachine.components.quaker.EndQuake = endStampedeShake
     
+    self.quakeMachine.componnets.quaker.OnUpdate = function() end
+    
     local function makeLouder(self)
-        print("makeLouder")
         self.soundIntensity = self.soundIntensity + .04
         self.inst.SoundEmitter:SetParameter("earthquake","intensity",self.soundIntensity)
     end
@@ -228,7 +229,7 @@ local function releaseRandomMobs(self)
             end
             
             -- If spiders...give a chance at warrior spiders
-            if prefab == "spider" and math.random() < .5 then
+            if prefab == "spider" and math.random() < .25 then
                 prefab = "spider_warrior"
             end
             
@@ -271,15 +272,13 @@ local function releaseRandomMobs(self)
                     theMob:AddTag("SpecialPigman")
                 end
                 
-                -- TODO: Make some lighting when lightninggoats are the attackers. Maybe just one...
-                
+                -- Quit trying to find a herd dumb mobs
                 if theMob.components.herdmember then
-                    print("Making this thing no longer a member of a herd")
                     theMob:RemoveComponent("herdmember")
                 end
                 
+                -- Quit trying to go home. Your home is the afterlife.
                 if theMob.components.knownlocations then
-                    print("Removing home from known locations")
                     theMob.components.knownlocations:ForgetLocation("home")
                 end
                 
@@ -302,8 +301,9 @@ local function releaseRandomMobs(self)
 				
 				theMob.Physics:Teleport(spawn_pt:Get())
 				theMob:FacePoint(pt)
-				--theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
-                theMob.components.combat:SetTarget(GLOBAL.GetPlayer())
+                
+				theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+                --theMob.components.combat:SetTarget(GLOBAL.GetPlayer())
                 
                 -- Stuff to do after all of the mobs are released
                 if self.houndstorelease == 0 then
@@ -321,11 +321,16 @@ local function releaseRandomMobs(self)
 	
 
     local origPlanFunction = self.PlanNextHoundAttack
-    local function planNextAttack()
+    local function planNextAttack(self, prefabIndex)
         origPlanFunction(self)
         -- Set the next type of mob
         print("Planning next attack...")
-        currentIndex = getRandomMob()
+        if prefabIndex and prefabIndex > 0 and prefabIndex <= #MOB_LIST then
+            print("Prefab overwrite")
+            currentIndex = prefabIndex
+        else
+            currentIndex = getRandomMob()
+        end
         print("Picked " .. MOB_LIST[currentIndex].prefab .. " as next mob")
         self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[currentIndex].mobMult)
         print("Number scheduled to be released: " .. self.houndstorelease)
@@ -354,15 +359,16 @@ local function releaseRandomMobs(self)
         -- If beefalo are coming, start the stampede effects
         if MOB_LIST[currentIndex].prefab == "beefalo" then
             if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.quakeStarted then
-                print("Starting quake")
-                self.quakeMachine.components.quaker:WarnQuake(self.timetoattack + 3, 0.08)
+
+                local quakeTime = 4*(self.houndstorelease+1) + self.timetoattack
+                print("Starting quake for " .. tostring(quakeTime) .. " seconds")
+                self.quakeMachine.components.quaker:WarnQuake(quakeTime)
                 self.quakeStarted = true
                 
-                -- Schedule volume increases. Want at least 5 of them
-                local interval = self.timetoattack/6
-                for i=1, 6 do
-                    print("Scheduling louder in " .. tostring(i*interval) .. " seconds")
-                    self.quakeMachine:DoTaskInTime(i*interval, function(self) print("LOUDER!") self.components.quaker:MakeStampedeLouder() end)
+                -- Schedule volume increases. Want at least 10 of them
+                local interval = self.timetoattack/10
+                for i=1, 10 do
+                    self.quakeMachine:DoTaskInTime(i*interval, function(self) self.components.quaker:MakeStampedeLouder() end)
                 end
             end
         end
@@ -370,8 +376,11 @@ local function releaseRandomMobs(self)
     end
     self.OnUpdate = newOnUpdate
     
-    local function fn(self)
-        self.timetoattack = 31
+    local function fn(self, prefabIndex)
+        if self.timetoattack > 31 then
+            print("Starting hound attack")
+            self.timetoattack = 31
+        end
     end
     self.StartAttackNow = fn
 
@@ -457,18 +466,3 @@ for k,v in pairs(MOB_LIST) do
         AddBrainPostInit(v.brain,MakeMobChasePlayer)
     end
 end
-
--- TODO: Automate this add based on the MOB_LIST. Either add a brain= to it or 
---       assume the brain is simply [MOB_LIST[i].prefab .. "brain"]
---[[
-if dlcEnabled then
-    AddBrainPostInit("lightninggoatbrain",MakeMobChasePlayer)
-end
-AddBrainPostInit("pigbrain",MakeMobChasePlayer)
-AddBrainPostInit("mermbrain",MakeMobChasePlayer)
-AddBrainPostInit("tallbirdbrain",MakeMobChasePlayer)
-AddBrainPostInit("mosquitobrain",MakeMobChasePlayer)
-AddBrainPostInit("killerbeebrain",MakeMobChasePlayer)
-AddBrainPostInit("spiderbrain",MakeMobChasePlayer)
-AddBrainPostInit("beefalobrain",MakeMobChasePlayer)
---]]
