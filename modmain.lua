@@ -179,7 +179,7 @@ end
 local function releaseRandomMobs(self)
 
     self.quakeMachine = GLOBAL.CreateEntity()
-    self.quakeMachine.persists = true
+    self.quakeMachine.persists = false
     self.quakeMachine.entity:AddSoundEmitter()
     self.quakeMachine.soundIntensity = 0.01
     self.currentIndex = nil
@@ -249,6 +249,8 @@ local function releaseRandomMobs(self)
 		            
 			local theMob = GLOBAL.SpawnPrefab(prefab)
 			if theMob then
+                theMob.persists = true -- Don't lose the mob on reload!
+                
                 -- I've modified the mobs brains to be mindless killers with this tag
                 theMob:AddTag("houndedKiller")
                 
