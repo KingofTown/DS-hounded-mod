@@ -22,11 +22,11 @@ local MOB_LIST =
     [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=.75,timeMult=1.2},
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
-    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.4},
+    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3},
     [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.2,timeMult=.3}, 
     [8]  = {enabled=true,RoG=true,prefab="lightninggoat",brain="lightninggoatbrain",mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
-    [10] = {enabled=false,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1}, --TODO, they don't seem to want to attack...
+    [10] = {enabled=true,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1}, --TODO, they don't seem to want to attack...
     [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, --TODO, what is with these dudes...
     [12] = {enabled=false,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1}, -- they don't want to keep on target :(
 }
@@ -44,7 +44,7 @@ local function disableMobs()
         end
         -- Get the config data for it
         local enabled = GetModConfigData(v.prefab)
-        if enabled == "off" then
+        if enabled ~= nil and enabled == "off" then
             print("Disabling " .. v.prefab .. " due to config setting")
             MOB_LIST[k].enabled = false
         end
@@ -273,6 +273,7 @@ local function releaseRandomMobs(self)
                     end
                     theMob.components.sleeper:SetSleepTest(sleepFcn)
                     theMob.components.sleeper:SetWakeTest(wakeFcn)
+                    
                 end
                 
                 -- Pigs might transform! Hmm, beardbunny dudes are werebeasts too
@@ -291,13 +292,20 @@ local function releaseRandomMobs(self)
                 end
                 
 				
-				-- Override the default KeepTarget for this prefab so it never stops
-								
-				--local function keepTargetOverride(inst, target)
-				--	return inst.components.combat:CanTarget(target)
-				--end
-				
-				--theMob.components.combat:SetKeepTargetFunction(keepTargetOverride)
+				-- Override the default KeepTarget for this mob.
+                -- Basically, if it's currently targeting the player, continue to.
+                -- If not, let it do whatever it's doing for now until it loses interest
+                -- and comes back for the player.
+				local origCanTarget = theMob.components.combat.keeptargetfn
+				local function keepTargetOverride(inst, target)
+                    if target:HasTag("player") and inst.components.combat:CanTarget(target) then
+                        return true
+                    else
+                        return origCanTarget and origCanTarget(inst,target)
+                    end
+                end
+				theMob.components.combat:SetKeepTargetFunction(keepTargetOverride)
+                
                 -- If the player is alive...go kill them
                 local function retargetOverride(inst)
                     target = GLOBAL.GetPlayer()
@@ -310,6 +318,11 @@ local function releaseRandomMobs(self)
 				theMob.Physics:Teleport(spawn_pt:Get())
 				theMob:FacePoint(pt)
                 
+                -- Set the min attack period to something...higher
+                local currentAttackPeriod = theMob.components.combat.min_attack_period
+                print("Mob current attack period: " .. currentAttackPeriod)
+                theMob.components.combat:SetAttackPeriod(math.max(currentAttackPeriod,3))
+
 				theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
                 --theMob.components.combat:SetTarget(GLOBAL.GetPlayer())
                 
@@ -468,7 +481,8 @@ local function MakeMobChasePlayer(brain)
     
     -- Made this a function so I can add more things to it if wanted. For now, just chase and attack.
     local function KillKillDieDie(inst)
-        return GLOBAL.ChaseAndAttack(inst,100)
+        ret = GLOBAL.ChaseAndAttack(inst,100,80)
+        return ret
     end
     
     --for i,node in ipairs(brain.bt.root.children) do
@@ -492,6 +506,7 @@ local function MakeMobChasePlayer(brain)
     table.insert(brain.bt.root.children, fireindex+1, chaseAndKill)
     
     -- Debug string to see that my KillKillDieDie was added
+    
     --for i,node in ipairs(brain.bt.root.children) do
     --    print("\t"..node.name.." > "..(node.children and node.children[1].name or ""))
     --end
