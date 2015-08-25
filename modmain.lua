@@ -11,26 +11,28 @@ local dlcEnabled = GLOBAL.IsDLCEnabled(GLOBAL.REIGN_OF_GIANTS)
         mobMult: multiplier compared to normal hound values (how many to release)
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
         
+        TODO: Have health defined here? It's a bit much fighing one of these sometimes...multiple seems impossible
+        
 --]]
 
 local MOB_LIST =
 {
     [1]  = {enabled=true,prefab="hound",mobMult=1,timeMult=1},
     [2]  = {enabled=true,prefab="merm",brain="mermbrain",mobMult=1,timeMult=1},
-    [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=1,timeMult=1.2},
+    [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=.75,timeMult=1.2},
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
-    [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=2.2,timeMult=.5},
-    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.5,timeMult=.4},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.5,timeMult=.4}, 
-    [8]  = {enabled=true,RoG=true,prefab="lightninggoat",brain="lightninggoatbrain",mobMult=1,timeMult=1}, 
-    [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=1,timeMult=1.5},
+    [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
+    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.4},
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.2,timeMult=.3}, 
+    [8]  = {enabled=true,RoG=true,prefab="lightninggoat",brain="lightninggoatbrain",mobMult=.75,timeMult=1.25}, 
+    [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
     [10] = {enabled=false,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1}, --TODO, they don't seem to want to attack...
     [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, --TODO, what is with these dudes...
     [12] = {enabled=false,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1}, -- they don't want to keep on target :(
 }
 
 -- This is for debugging. Set to random when launching the game.
-local currentIndex = 9
+--local currentIndex = 9
 
 -- Check the config file and the DLC to disable some of the mobs
 local function disableMobs()
@@ -176,11 +178,11 @@ end
 
 local function releaseRandomMobs(self)
 
-    -- Hounded is a quaker now! muahaha
     self.quakeMachine = GLOBAL.CreateEntity()
     self.quakeMachine.persists = true
     self.quakeMachine.entity:AddSoundEmitter()
     self.quakeMachine.soundIntensity = 0.01
+    self.currentIndex = nil
     
     -- Override the quake functions to only shake camera and play/stop the madness
     local function stampedeShake(self, duration, speed, scale)
@@ -214,11 +216,11 @@ local function releaseRandomMobs(self)
 		local pt = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
 		local spawn_pt = self:GetSpawnPoint(pt)
 
-        if currentIndex == nil then
+        if self.currentIndex == nil then
             -- Next wave hasn't been planned
             prefab,index = getRandomMob()
         else 
-            prefab = MOB_LIST[currentIndex].prefab
+            prefab = MOB_LIST[self.currentIndex].prefab
         end
         
         --print("HERE COMES A " .. prefab)
@@ -249,6 +251,8 @@ local function releaseRandomMobs(self)
 			if theMob then
                 -- I've modified the mobs brains to be mindless killers with this tag
                 theMob:AddTag("houndedKiller")
+                
+                -- TODO: Decrease health?
  
  
                 -- This mob has no home anymore. It's set to kill.
@@ -320,6 +324,7 @@ local function releaseRandomMobs(self)
 			end
 		end
 		
+        self.calcNextReleaseTime = (self.houndstorelease > 0)
 	end
 	self.ReleaseHound = ReleasePrefab
 	
@@ -331,14 +336,14 @@ local function releaseRandomMobs(self)
         print("Planning next attack...")
         if prefabIndex and prefabIndex > 0 and prefabIndex <= #MOB_LIST then
             print("Prefab overwrite")
-            currentIndex = prefabIndex
+            self.currentIndex = prefabIndex
         else
-            currentIndex = getRandomMob()
+            self.currentIndex = getRandomMob()
         end
-        print("Picked " .. MOB_LIST[currentIndex].prefab .. " as next mob")
-        self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[currentIndex].mobMult)
+        print("Picked " .. MOB_LIST[self.currentIndex].prefab .. " as next mob")
+        self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[self.currentIndex].mobMult)
         print("Number scheduled to be released: " .. self.houndstorelease)
-        updateWarningString(currentIndex)
+        updateWarningString(self.currentIndex)
     end
     
     self.PlanNextHoundAttack = planNextAttack
@@ -348,19 +353,23 @@ local function releaseRandomMobs(self)
         origOnUpdate(self,dt)
         -- Modify the next release time based on the current prefab
         if self.timetoattack <= 0 then
-            if MOB_LIST[currentIndex].timeMult ~= 1 then
+            if MOB_LIST[self.currentIndex].timeMult ~= 1 and self.calcNextReleaseTime then
                 local orig = self.timetonexthound
-                self.timetonexthound = self.timetonexthound * MOB_LIST[currentIndex].timeMult
+                print("self.timetonexthound: " .. tostring(self.timetonexthound))
+                print("timeMult: " .. tostring(MOB_LIST[self.currentIndex].timeMult))
+                self.timetonexthound = self.timetonexthound * MOB_LIST[self.currentIndex].timeMult
+                self.calcNextReleaseTime = false
             end
             
             if self.quakeStarted then
-                self.quakeMachine:EndQuake()
+                self.quakeMachine:DoTaskInTime(5, function(self) self:EndQuake() end)
+                --self.quakeMachine:EndQuake()
                 self.quakeStarted = false
             end
         end
         
         -- If beefalo are coming, start the stampede effects
-        if MOB_LIST[currentIndex].prefab == "beefalo" then
+        if MOB_LIST[self.currentIndex].prefab == "beefalo" then
             if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.quakeStarted then
 
                 local quakeTime = 4*(self.houndstorelease+1) + self.timetoattack
@@ -386,10 +395,36 @@ local function releaseRandomMobs(self)
     end
     self.OnUpdate = newOnUpdate
     
+    local origOnSave = self.OnSave
+    local function newOnSave(self)
+        data = origOnSave(self)
+        -- if save is empty, don't save I guess?
+        if GLOBAL.next(data) ~= nil then
+            if self.currentIndex ~= nil then
+                data.currentIndex = self.currentIndex
+            end
+            return data
+        end
+    end
+    self.OnSave = newOnSave
+    
+    local origOnLoad = self.OnLoad
+    local function newOnLoad(data, newEnts)
+        origOnLoad(self,newEnts)
+        local test = data.currentIndex
+        self.currentIndex = newEnts.currentIndex or nil
+        
+        if self.currentIndex == nil then
+            print("Could not load index. Plan next attack")
+            self:PlanNextHoundAttack()
+        end
+    end
+    self.OnLoad = newOnLoad
+    
     local function fn(self, prefabIndex)
         if self.timetoattack > 31 then
             print("Starting hound attack")
-            self.timetoattack = 31
+            self.timetoattack = 18
         end
     end
     self.StartAttackNow = fn
@@ -477,5 +512,12 @@ for k,v in pairs(MOB_LIST) do
     end
 end
 
--- TODO: 
-AddSimPostInit(function() GLOBAL.GetWorld().components.hounded:PlanNextHoundAttack() end)
+local function firstTimeLoad()
+    if GLOBAL.GetWorld().components.hounded.currentIndex == nil then
+        print("First time loading this mod. Generating new hound attack")   
+        GLOBAL.GetWorld().components.hounded:PlanNextHoundAttack()
+    else
+        print("currentIndex: " .. GLOBAL.GetWorld().components.hounded.currentIndex)
+    end
+end
+AddSimPostInit(function() firstTimeLoad() end)
