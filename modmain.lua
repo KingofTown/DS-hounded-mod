@@ -29,7 +29,7 @@ local MOB_LIST =
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
     [10] = {enabled=true,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1},
-    [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, 
+    [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, -- These dudes don't work too well
     [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5}, 
     [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},mobMult=1,timeMult=1}, -- Needs work. They wont get enraged.
 }
@@ -251,7 +251,14 @@ local function releaseRandomMobs(self)
             -- override the ShouldSleep functions
             if mob.components.sleeper ~= nil then
                 local sleepFcn = function(self,inst)
-                    -- Super hack! Just keep suggesting this mob attacks the player.
+                    --[[ Just keep suggesting this mob attacks the player. These are 
+					     merciless killers after all.
+					       "Should I sleep?"
+					       "NO! Attack that guy!"
+					       ...
+						   "Should I sleep?"
+						   "NO! Attack that guy!"
+					--]]
                     mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
                     return false
                 end
@@ -285,6 +292,7 @@ local function releaseRandomMobs(self)
             -- and comes back for the player.
             local origCanTarget = mob.components.combat.keeptargetfn
             local function keepTargetOverride(inst, target)
+				-- TODO: Check distance of player?
                 if target:HasTag("player") and inst.components.combat:CanTarget(target) then
                     return true
                 else
@@ -362,11 +370,28 @@ local function releaseRandomMobs(self)
             if self.houndstorelease <= 0 then 
                 self.houndstorelease = 0
             end
+			
+			-- Increase chances of special mobs later on
+			local specialMobChance = self:GetSpecialHoundChance()
             
             -- If spiders...give a chance at warrior spiders
-            if prefab == "spider" and math.random() < .25 then
+            if prefab == "spider" and math.random() < specialMobChance then
                 prefab = "spider_warrior"
             end
+			
+
+			
+			-- If hounds...maybe have some fire or ice
+			if prefab == "hound" then 
+				if math.random() < specialMobChance then
+					if GetSeasonManager():IsWinter() then
+						prefab = "icehound"
+					else
+						prefab = "firehound"
+					end
+				end		
+			end
+			
             
             -- This is nearby lightning...not a bolt. Don't want to make
             -- them all charged (unless that would be fun...)
@@ -391,12 +416,13 @@ local function releaseRandomMobs(self)
                     end
                 end
                 
+				
+				-- If lightning goat...give it a chance to get struck by lightning
                 local exciteGoat = function(self)
                     local goatPos = Vector3(self.Transform:GetWorldPosition())
                     GLOBAL.GetSeasonManager():DoLightningStrike(goatPos)
                 end
-                -- If lightning goat...give it a chance to get struck by lightning
-                if theMob:HasTag("lightninggoat") and math.random() < 0.35 then
+                if theMob:HasTag("lightninggoat") and math.random() < (.9*specialMobChance) then
                     theMob:DoTaskInTime(math.max(5,10*math.random()),exciteGoat)
                 end
                 
@@ -405,8 +431,9 @@ local function releaseRandomMobs(self)
                 
                 -- Stuff to do after all of the mobs are released
                 if self.houndstorelease == 0 then
+				
                     -- Transform the pigs to werepigs
-                    if theMob:HasTag("SpecialPigman") then
+                    if theMob:HasTag("SpecialPigman") and math.random() < (1.2*specialMobChance) then
                         self.inst:DoTaskInTime(5, function(inst) transformThings() end)
                     end
                     
@@ -426,7 +453,7 @@ local function releaseRandomMobs(self)
         -- Set the next type of mob
         print("Planning next attack...")
         if prefabIndex and prefabIndex > 0 and prefabIndex <= #MOB_LIST then
-            print("Prefab overwrite")
+            print("Prefab selection overwrite")
             self.currentIndex = prefabIndex
         else
             self.currentIndex = getRandomMob()
@@ -461,7 +488,6 @@ local function releaseRandomMobs(self)
             
             if self.quakeStarted then
                 self.quakeMachine:DoTaskInTime(5, function(self) self:EndQuake() end)
-                --self.quakeMachine:EndQuake()
                 self.quakeStarted = false
             end
         end
@@ -493,34 +519,47 @@ local function releaseRandomMobs(self)
         -- If lightning goats are coming, start some weather effects
         elseif MOB_LIST[self.currentIndex].prefab == "lightninggoat" then
             if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.inst.overcastStarted then
+								
                 -- We're in the warning interval. Lets make some clouds (only if it's day)
                 self.inst.overcastStarted = true
                 if GLOBAL.GetClock():IsDay() then
                     self.inst.startColor = GLOBAL.GetClock().currentColour
+					print("Start/Clouds/End")
+					print(self.inst.startColor)
+					
+					-- Get the curent cloud cover
+					currentClouds = GLOBAL.GetSeasonManager():GetWeatherLightPercent()
+					print("Current cloud cover percent: " .. currentClouds)
+					
+					-- The clock uses the absolute day color already. Don't need to 
+					-- adjust to this. Just adjusting initially so we don't make it flash brighter, THEN
+					-- get darker. Instead, start at current cloud cover and add MORE!
 
-                    -- make it 50% darker?
+                    -- Make some (more) clouds! These are supposed to be ominous!
                     self.inst.endColor = GLOBAL.Point(0,0,0)
-                    self.inst.endColor.x = .5*self.inst.startColor.x
-                    self.inst.endColor.y = .5*self.inst.startColor.y
-                    self.inst.endColor.z = .5*self.inst.startColor.z
+                    self.inst.endColor.x = .5*currentClouds*self.inst.startColor.x
+                    self.inst.endColor.y = .5*currentClouds*self.inst.startColor.y
+                    self.inst.endColor.z = .5*currentClouds*self.inst.startColor.z
+					print(self.inst.endColor)
                     
-                    -- Fade to a darker overcast to simulate clouds
-                    GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-5)
+                    -- Make it darker
+                    GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-8)
                     
                     local makeCloudsGoAway = function(self)
                         -- Don't fix the color if it went to dusk as that would break the color
                         if GLOBAL.GetClock():IsDay() then
-                            GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,2)
+                            GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
                         end
                         self.overcastStarted = false
                     end
                     -- When done...transition back to normal color
-                    local cloudTime = 3*(self.houndstorelease+1) + self.timetoattack
+                    local cloudTime = 8*(self.houndstorelease+1) + self.timetoattack
                     self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
                 end
                 
                 -- Schedule some distant thunder
                 local interval = self.timetoattack/6
+
                 for i=1,5 do
                     self.inst:DoTaskInTime(i*interval*(math.random()+1), function(self) 
                             GLOBAL.GetPlayer().SoundEmitter:PlaySound("dontstarve/rain/thunder_far","far_thunder") 
@@ -629,7 +668,8 @@ local function MakeMobChasePlayer(brain)
     --]]
 
     local function KillKillDieDie(inst)
-        ret = GLOBAL.ChaseAndAttack(inst,100,80)
+		-- Chase for 80 seconds, target distance 60
+        ret = GLOBAL.ChaseAndAttack(inst,80,60)
         return ret
     end
     
