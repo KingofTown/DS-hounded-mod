@@ -59,6 +59,21 @@ disableMobs()
 STRINGS = GLOBAL.STRINGS
 local defaultPhrase = STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS
 STRINGS.CHARACTERS.GENERIC.ANNOUNCE_HOUNDS = "WTF WAS THAT!!"
+
+local warningCount = 1
+
+-- Dumb function to get a dumb string for a dumb idea :P
+local function getDumbString(num)
+    if num == 1 then return "ONE!"
+    elseif num == 2 then return "TWO!"
+    elseif num == 3 then return "THREE!"
+    elseif num == 4 then return "FOUR!"
+    else return "TOO MANY!" end
+end
+
+
+-- This is called after each verbal warning. If new strings are wanted,
+-- just check the warningCount.
 local function updateWarningString(index)
 
     if GLOBAL.GetPlayer() == nil then
@@ -88,11 +103,20 @@ local function updateWarningString(index)
     elseif prefab == "lightninggoat" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Those giant dark clouds look ominous"
     elseif prefab == "beefalo" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Earthquake? It's getting louder..."
+        if warningCount == 1 then
+            STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Earthquake?!?"
+        else
+            STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Wait...no...STAMPEDE!!!"
+        end
+    elseif prefab == "bat" then
+        -- TODO: Increment the count each warning lol
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = getDumbString(warningCount) .. " Ah ah ah!"
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
 end
+
+
 ---------------------------------------------------------------------
 
 local function getRandomMob()
@@ -205,7 +229,6 @@ local function releaseRandomMobs(self)
     
     self.RemoveMob = function(self,mob)
         if mob and self.currentMobs[mob] then
-            print("Removing " .. tostring(mob.prefab) .. " from mob list")
             self.currentMobs[mob] = nil
             self.numMobsSpawned = self.numMobsSpawned - 1
         end
@@ -214,10 +237,13 @@ local function releaseRandomMobs(self)
     
     -- Override the quake functions to only shake camera and play/stop the madness
     local function stampedeShake(self, duration, speed, scale)
-                             -- type,duration,speed,maxshake,maxdist
+                             -- type,duration,speed,scale,maxdist
         GLOBAL.TheCamera:Shake("FULL", duration, speed, scale, 80)
-        -- Increase the intensity for the next call
-        self.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
+        
+        -- Increase the intensity for the next call (only start the sound once)
+        if not self.quakeStarted then
+            self.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
+        end
         self.SoundEmitter:SetParameter("earthquake", "intensity", self.soundIntensity)
         
     end
@@ -397,13 +423,19 @@ local function releaseRandomMobs(self)
         self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[self.currentIndex].mobMult)
         print("Number scheduled to be released: " .. self.houndstorelease)
         updateWarningString(self.currentIndex)
+        
+        -- Reset the warning counter
+        warningCount = 1
     end
     
     self.PlanNextHoundAttack = planNextAttack
     
     local origOnUpdate = self.OnUpdate
     local function newOnUpdate(self,dt)
+    
+        local didWarnFirst = self.announcewarningsoundinterval
         origOnUpdate(self,dt)
+        local didWarnSecond = self.announcewarningsoundinterval
         -- Modify the next release time based on the current prefab
         if self.timetoattack <= 0 then
             if MOB_LIST[self.currentIndex].timeMult ~= 1 and self.calcNextReleaseTime then
@@ -428,7 +460,9 @@ local function releaseRandomMobs(self)
                 
                 local interval = self.timetoattack / 2
 
-                self.quakeMachine:DoTaskInTime(0, function(self) self:WarnQuake(interval*2, .015, .1) end)
+                --self.quakeMachine:DoTaskInTime(0, function(self) self:WarnQuake(interval*2, .015, .1) end)
+                self.quakeMachine:WarnQuake(interval*2,.015,.1)
+                -- Camera shake decreases in intensity as it goes on...but I want it to INCREASE!!
                 self.quakeMachine:DoTaskInTime(1*interval, function(self) self:WarnQuake(interval*2, .02, .1) end)
                 self.quakeMachine:DoTaskInTime(2*interval, function(self) self:WarnQuake(interval*2, .025, .1) end)
 
@@ -443,14 +477,19 @@ local function releaseRandomMobs(self)
             end
         end
         
+        -- In this case...hounded issued a verbal warning
+        if didWarnFirst < didWarnSecond and self.timetoattack > 0 then
+            warningCount = warningCount + 1
+            updateWarningString(self.currentIndex)
+        end
+        
     end
     self.OnUpdate = newOnUpdate
     
     local origOnSave = self.OnSave
     local function newOnSave(self)
         data = origOnSave(self)
-        -- If this is empty...hounded knew about
-        -- something....so leave it empty.
+        -- If this is empty...then don't bother saving anything.
         if GLOBAL.next(data) ~= nil then
             data.currentIndex = self.currentIndex
             local mobs = {}

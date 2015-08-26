@@ -1,6 +1,6 @@
 -- Mod Settings
-name = "Super Hounded"
-description = "Occasional Hound attack getting boring? Try this one out. Each hound attack will instead be an attack from a random mob selected from the configuration file."
+name = "Super Hound Waves"
+description = "Occasional Hound attack getting boring? Try this out. Each hound attack will instead be an attack from a random mob selected from the configuration file."
 author = "KingofTown"
 version = "0.1"
 forumthread = "None"
@@ -99,6 +99,33 @@ configuration_options =
 	{
 		name = "killerbee",
 		label = "Killer Bees",
+		options =	{
+						{description = "On", data = "default"},
+						{description = "Off", data = "off"},
+					},
+		default = "default",
+	},
+	{
+		name = "bat",
+		label = "Bats",
+		options =	{
+						{description = "On", data = "default"},
+						{description = "Off", data = "off"},
+					},
+		default = "default",
+	},
+	{
+		name = "rook",
+		label = "Clockwork Rooks",
+		options =	{
+						{description = "On", data = "default"},
+						{description = "Off", data = "off"},
+					},
+		default = "default",
+	},
+	{
+		name = "knight",
+		label = "Clockwork Knights",
 		options =	{
 						{description = "On", data = "default"},
 						{description = "Off", data = "off"},
