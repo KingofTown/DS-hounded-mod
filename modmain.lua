@@ -177,6 +177,15 @@ local function getRandomMob()
                     print("Skipping " .. tostring(MOB_LIST[v].prefab) .. " as mob because season not met")
                 end
             end
+			
+			-- Don't do spiders if the player is a 'spiderwhisperer' (webber)
+			-- Note, these spiders won't follow the spiderhat like normal ones.
+			if MOB_LIST[v].prefab == "spider" then
+				if GLOBAL.GetPlayer() and GLOBAL.GetPlayer():HasTag("spiderwhisperer") then
+					print("Not picking spiders...the player is a spiderwhisperer!")
+					pickThisMob = false
+				end
+			end
             
             -- If this is still true, return this selection 
             if pickThisMob then 
