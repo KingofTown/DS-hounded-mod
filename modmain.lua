@@ -355,7 +355,7 @@ local function releaseRandomMobs(self)
                 -- This fcn will add it to our list and put a bunch of stuff on it
                 self:AddMob(theMob)
 
-                -- This is stuff that only happens after spawn. Leave it here.
+                -- This is stuff that happens when spawning (not onLoad). 
 
                 -- Mosquitos should have a random fill rate instead of all being at 0
                 if theMob:HasTag("mosquito") then
@@ -363,6 +363,15 @@ local function releaseRandomMobs(self)
                     for i=0,fillUp do
                         theMob:PushEvent("onattackother",{data=theMob})
                     end
+                end
+                
+                local exciteGoat = function(self)
+                    local goatPos = Vector3(self.Transform:GetWorldPosition())
+                    GLOBAL.GetSeasonManager():DoLightningStrike(goatPos)
+                end
+                -- If lightning goat...give it a chance to get struck by lightning
+                if theMob:HasTag("lightninggoat") and math.random() < 0.35 then
+                    theMob:DoTaskInTime(math.max(5,10*math.random()),exciteGoat)
                 end
                 
 				theMob.Physics:Teleport(spawn_pt:Get())
@@ -470,32 +479,33 @@ local function releaseRandomMobs(self)
                     self.inst.endColor.z = .5*self.inst.startColor.z
                     
                     -- Fade to a darker overcast to simulate clouds
-                    GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack)
+                    GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-5)
                     
                     local makeCloudsGoAway = function(self)
                         -- Don't fix the color if it went to dusk as that would break the color
                         if GLOBAL.GetClock():IsDay() then
-                            GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
+                            GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,2)
                         end
                         self.overcastStarted = false
                     end
                     -- When done...transition back to normal color
-                    self.inst:DoTaskInTime(self.timetoattack+10, makeCloudsGoAway)
+                    local cloudTime = 3*(self.houndstorelease+1) + self.timetoattack
+                    self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
                 end
                 
                 -- Schedule some distant thunder
-                local interval = self.timetoattack/5
+                local interval = self.timetoattack/6
                 for i=1,5 do
-                    self.inst:DoTaskInTime(i*interval, function(self) 
+                    self.inst:DoTaskInTime(i*interval*(math.random()+1), function(self) 
                             GLOBAL.GetPlayer().SoundEmitter:PlaySound("dontstarve/rain/thunder_far","far_thunder") 
-                            GLOBAL.GetPlayer().SoundEmitter:SetParameter("far_thunder", "intensity", .015*i) end)
+                            GLOBAL.GetPlayer().SoundEmitter:SetParameter("far_thunder", "intensity", .02*i) end)
                             
                 end
                 
             end
         end
         
-        -- In this case...hounded issued a verbal warning
+        -- In this case...hounded issued a verbal warning. Update the strings to next warning
         if didWarnFirst < didWarnSecond and self.timetoattack > 0 then
             warningCount = warningCount + 1
             updateWarningString(self.currentIndex)
@@ -538,7 +548,6 @@ local function releaseRandomMobs(self)
             for k,v in pairs(savedata.mobs) do
                 local targ = newents[v]
                 if targ then
-                    -- Add this mob back to our counter
                     self:AddMob(targ.entity)
                 end
             end
@@ -554,7 +563,7 @@ local function releaseRandomMobs(self)
             self.timetoattack = timeToAttack
         end
     end
-    self.StartAttackNow = fn
+    self.StartAttack = fn
 
 end
 AddComponentPostInit("hounded",releaseRandomMobs)
