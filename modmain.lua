@@ -184,6 +184,34 @@ local function releaseRandomMobs(self)
     self.quakeMachine.soundIntensity = 0.01
     self.currentIndex = nil
     
+    -------------------------------------------------------------
+    -- I guess we have to store these mobs that we can tag them onLoad
+    self.currentMobs = {}
+    self.numMobsSpawned = 0
+
+    self.AddMob = function(self,mob)
+        if self.currentMobs[mob] == nil and mob then
+            self.currentMobs[mob] = true
+            self.numMobsSpawned = self.numMobsSpawned + 1
+            -- Listen for death events on these dudes
+            mob.deathfn = function() self:RemoveMob(mob) end
+            
+            -- If the mob leaves, remove it from the list
+            self.inst:ListenForEvent("death", mob.deathfn,mob)
+            self.inst:ListenForEvent("onremove", mob.deathfn, mob )
+        end
+    end
+    
+    
+    self.RemoveMob = function(self,mob)
+        if mob and self.currentMobs[mob] then
+            print("Removing " .. tostring(mob.prefab) .. " from mob list")
+            self.currentMobs[mob] = nil
+            self.numMobsSpawned = self.numMobsSpawned - 1
+        end
+    end
+    -----------------------------------------------------------------
+    
     -- Override the quake functions to only shake camera and play/stop the madness
     local function stampedeShake(self, duration, speed, scale)
                              -- type,duration,speed,maxshake,maxdist
@@ -248,11 +276,10 @@ local function releaseRandomMobs(self)
 			local day = GLOBAL.GetClock().numcycles
 		            
 			local theMob = GLOBAL.SpawnPrefab(prefab)
-			if theMob then
-                theMob.persists = true -- Don't lose the mob on reload!
-                
+			if theMob then                
                 -- I've modified the mobs brains to be mindless killers with this tag
                 theMob:AddTag("houndedKiller")
+
                 
                 -- TODO: Decrease health?
  
@@ -344,6 +371,9 @@ local function releaseRandomMobs(self)
                     end
                     
                 end
+                
+                -- Start tracking this mob!
+                self:AddMob(theMob)
 			end
 		end
 		
@@ -419,11 +449,16 @@ local function releaseRandomMobs(self)
     local origOnSave = self.OnSave
     local function newOnSave(self)
         data = origOnSave(self)
-        -- if save is empty, don't save I guess?
+        -- If this is empty...hounded knew about
+        -- something....so leave it empty.
         if GLOBAL.next(data) ~= nil then
-            if self.currentIndex ~= nil then
-                data.currentIndex = self.currentIndex
+            data.currentIndex = self.currentIndex
+            local mobs = {}
+            for k,v in pairs(self.currentMobs) do
+                saved = true
+                table.insert(mobs, k.GUID)
             end
+            data.mobs = mobs
             return data
         end
     end
@@ -434,14 +469,34 @@ local function releaseRandomMobs(self)
         origOnLoad(self,newEnts)
         local test = data.currentIndex
         self.currentIndex = newEnts.currentIndex or nil
-        
         if self.currentIndex == nil then
-            print("Could not load index. Plan next attack")
+            print("Could not load index. Planning next attack")
             self:PlanNextHoundAttack()
         end
     end
     self.OnLoad = newOnLoad
     
+    self.LoadPostPass = function(self,newents,savedata)
+        if savedata and savedata.mobs then
+            for k,v in pairs(savedata.mobs) do
+                local targ = newents[v]
+                if targ then
+                    -- Add this mob back to our counter
+                    self:AddMob(targ.entity)
+                    
+                    -- Add the tags back to this mob
+                    targ.entity:AddTag("houndedKiller")
+                    
+                    -- Our pigs are special...they know this
+                    if targ.entity.components.werebeast then
+                        targ.entity:AddTag("SpecialPigman")
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Helper function to start an attack.
     local function fn(self, prefabIndex)
         if self.timetoattack > 31 then
             print("Starting hound attack")
@@ -458,14 +513,11 @@ local function transformFcn(inst)
     if inst:HasTag("SpecialPigman") then
         inst.components.werebeast:SetWere()
         
-        -- Don't transform back in the day or night. Were here to stay!
-        -- inst:RemoveAllEventCallbacks() -- hmm...this will get rid of important ones...
-        
         -- Don't sleep!
         inst.components.sleeper:SetSleepTest(sleepFcn)
         inst.components.sleeper:SetWakeTest(wakeFcn)
         
-        -- Keep going for the player
+        -- Keep going for the player after transform
         inst.components.combat:SuggestTarget(GLOBAL.GetPlayer())
     end
 end
@@ -481,24 +533,21 @@ AddPrefabPostInit("pigman",AddPigmanTransformEvent)
 
 --------------------------------------------------
 -- Brain Modifications
+--------------------------------------------------
 
 local ipairs = GLOBAL.ipairs
 local function MakeMobChasePlayer(brain)
-    -- Make this the top of the priority node. Basically, if they have the insane tag (we add it above), they will
-    -- prioritize chasing and attempting to kill the player before doing normal things.
-    
-    -- Made this a function so I can add more things to it if wanted. For now, just chase and attack.
+    --[[ Make this the top of the priority node. Basically, if they have the 
+         insane tag (we add it above), they will prioritize chasing and attempting 
+         to kill the player before doing normal things.
+    --]]
+
     local function KillKillDieDie(inst)
         ret = GLOBAL.ChaseAndAttack(inst,100,80)
         return ret
     end
     
-    --for i,node in ipairs(brain.bt.root.children) do
-    --    print("\t"..node.name.." > "..(node.children and node.children[1].name or ""))
-    --end
-    
     chaseAndKill = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Kill Kill", KillKillDieDie(brain.inst))
-    --chaseAndKill = WhileNode(function() return self.inst:HasTag("houndedKiller") end , "Kill Kill", ChaseAndAttack(self.inst, 100))
     
     -- Find the root node. Insert this WhileNode at the top.
     -- Well, we'll put it after "OnFire" (if it exists) so it will still panic if on fire
@@ -535,6 +584,9 @@ for k,v in pairs(MOB_LIST) do
     end
 end
 
+---------------------------------------------------------------------------
+-- Generate a new special hound effect if this has never been loaded before
+---------------------------------------------------------------------------
 local function firstTimeLoad()
     if GLOBAL.GetWorld().components.hounded.currentIndex == nil then
         print("First time loading this mod. Generating new hound attack")   
@@ -544,3 +596,4 @@ local function firstTimeLoad()
     end
 end
 AddSimPostInit(function() firstTimeLoad() end)
+
