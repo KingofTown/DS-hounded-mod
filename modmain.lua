@@ -538,32 +538,38 @@ local function releaseRandomMobs(self)
 					
 					-- Get the curent cloud cover
 					currentClouds = GLOBAL.GetSeasonManager():GetWeatherLightPercent()
-					print("Current cloud cover percent: " .. currentClouds)
+					print("Current cloud cover percent: " .. (1-currentClouds))
 					
-					-- The clock uses the absolute day color already. Don't need to 
-					-- adjust to this. Just adjusting initially so we don't make it flash brighter, THEN
-					-- get darker. Instead, start at current cloud cover and add MORE!
+					-- If there is more than 50% cloud cover...don't make it even darker!
+					if (1-currentClouds) < .5 then
+					
+						-- The clock uses the absolute day color already. Don't need to 
+						-- adjust to this. Just adjusting initially so we don't make it flash brighter, THEN
+						-- get darker. Instead, start at current cloud cover and add MORE!
 
-                    -- Make some (more) clouds! These are supposed to be ominous!
-                    self.inst.endColor = GLOBAL.Point(0,0,0)
-                    self.inst.endColor.x = .5*currentClouds*self.inst.startColor.x
-                    self.inst.endColor.y = .5*currentClouds*self.inst.startColor.y
-                    self.inst.endColor.z = .5*currentClouds*self.inst.startColor.z
-					print(self.inst.endColor)
-                    
-                    -- Make it darker
-                    GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-8)
-                    
-                    local makeCloudsGoAway = function(self)
-                        -- Don't fix the color if it went to dusk as that would break the color
-                        if GLOBAL.GetClock():IsDay() then
-                            GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
-                        end
-                        self.overcastStarted = false
-                    end
-                    -- When done...transition back to normal color
-                    local cloudTime = 8*(self.houndstorelease+1) + self.timetoattack
-                    self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
+						-- Make some (more) clouds! These are supposed to be ominous!
+						self.inst.endColor = GLOBAL.Point(0,0,0)
+						self.inst.endColor.x = .5*currentClouds*self.inst.startColor.x
+						self.inst.endColor.y = .5*currentClouds*self.inst.startColor.y
+						self.inst.endColor.z = .5*currentClouds*self.inst.startColor.z
+						print(self.inst.endColor)
+						
+						-- Make it darker
+						GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-8)
+						
+						local makeCloudsGoAway = function(self)
+							-- Don't fix the color if it went to dusk as that would break the color
+							if GLOBAL.GetClock():IsDay() then
+								GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
+							end
+							self.overcastStarted = false
+						end
+						-- When done...transition back to normal color
+						local cloudTime = 8*(self.houndstorelease+1) + self.timetoattack
+						self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
+					else
+						print("Dark enough already. Not making darker")
+					end
                 end
                 
                 -- Schedule some distant thunder

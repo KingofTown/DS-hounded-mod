@@ -1,6 +1,8 @@
 -- Mod Settings
 name = "Super Hound Waves"
-description = "Occasional Hound attack getting boring? Try this out. Each hound attack will instead be an attack from a random mob selected from the configuration file."
+description = "Occasional Hound attack getting boring? Try this out. Each hound attack will instead" ..
+              " be an attack from a random mob selected from the configuration file.\n" ..
+			  "Surprises await those brave enough to try it out."
 author = "KingofTown"
 version = "0.1"
 forumthread = "None"
@@ -108,15 +110,6 @@ configuration_options =
 	{
 		name = "bat",
 		label = "Bats",
-		options =	{
-						{description = "On", data = "default"},
-						{description = "Off", data = "off"},
-					},
-		default = "default",
-	},
-	{
-		name = "rook",
-		label = "Clockwork Rooks",
 		options =	{
 						{description = "On", data = "default"},
 						{description = "Off", data = "off"},
