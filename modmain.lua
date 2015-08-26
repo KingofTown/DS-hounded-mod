@@ -106,7 +106,7 @@ local function updateWarningString(index)
         if warningCount == 1 then
             STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Earthquake?!?"
         else
-            STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Wait...no...STAMPEDE!!!"
+            STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Wait, no...STAMPEDE!!!"
         end
     elseif prefab == "bat" then
         -- TODO: Increment the count each warning lol
@@ -158,50 +158,38 @@ local function getRandomMob()
             else
                 return v
             end
-            
         end
     end
 
     -- If we are here...there is NOTHING in the list enabled.
     -- This is strange. Just return hound I guess (even though
     -- hound is in the list and the user disabled it...)
+    print("WARNING: No mobs enabled in config! Using Hound as default")
     return 1
-
-    --local index = math.random(1,#MOB_LIST)
-    --mob = MOB_LIST[index]  
-    --return mob.prefab, index
 end
 
 
---
-local function transformThings(inst)
 
-    print("Searching for pigs")
+local function transformThings(inst)
     local playPos = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
     local naughtyPigs = TheSim:FindEntities(playPos.x,playPos.y,playPos.z, 80, {"SpecialPigman"})
-    print("Found " .. #naughtyPigs .. " special pigs around me")
     for k,v in pairs(naughtyPigs) do 
         --print("Pushing event for " .. tostring(v))
         local pigPos = Vector3(v.Transform:GetWorldPosition())
-        -- Get the pig's position
-        
         -- Strike lightning on pig (make it not burnable first)
         v:RemoveComponent("burnable")
         GLOBAL.GetSeasonManager():DoLightningStrike(pigPos)
         -- If we add it too fast, they will be on fire but not showing fire...
-        v:DoTaskInTime(1, function(inst) print("......") inst:AddComponent("burnable") end)
+        v:DoTaskInTime(1, function(inst) inst:AddComponent("burnable") end)
         
         --GLOBAL.GetSeasonManager():DoMediumLightning()
         -- tranform
         v:PushEvent("transform_special_pigs",{inst=v})
-        
     end
-    
 end
 
 
 local function releaseRandomMobs(self)
-
     self.quakeMachine = GLOBAL.CreateEntity()
     self.quakeMachine.persists = false
     self.quakeMachine.entity:AddSoundEmitter()
@@ -223,6 +211,68 @@ local function releaseRandomMobs(self)
             -- If the mob leaves, remove it from the list
             self.inst:ListenForEvent("death", mob.deathfn,mob)
             self.inst:ListenForEvent("onremove", mob.deathfn, mob )
+            
+            
+            --Add All of the stuff for this mob here so we can persist on save states----
+                            -- I've modified the mobs brains to be mindless killers with this tag
+            mob:AddTag("houndedKiller")
+
+            -- This mob has no home anymore. It's set to kill.
+            if mob.components.homeseeker then
+                mob:RemoveComponent("homeseeker")
+            end
+            
+            -- Can't remove 'sleeper' tag as it causes the entity to throw errors. Just
+            -- override the ShouldSleep functions
+            if mob.components.sleeper ~= nil then
+                local sleepFcn = function(self,inst)
+                    -- Super hack! Just keep suggesting this mob attacks the player.
+                    mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+                    return false
+                end
+                local wakeFcn = function(self,inst)
+                    return true
+                end
+                mob.components.sleeper:SetSleepTest(sleepFcn)
+                mob.components.sleeper:SetWakeTest(wakeFcn)
+                
+            end
+            
+            -- Pigs might transform! Hmm, beardbunny dudes are werebeasts too
+            if mob.components.werebeast ~= nil then
+                mob:AddTag("SpecialPigman")
+            end
+            
+            -- Quit trying to find a herd dumb mobs
+            if mob.components.herdmember then
+                mob:RemoveComponent("herdmember")
+            end
+            
+            -- Quit trying to go home. Your home is the afterlife.
+            if mob.components.knownlocations then
+                mob.components.knownlocations:ForgetLocation("home")
+            end
+            
+            -- Override the default KeepTarget for this mob.
+            -- Basically, if it's currently targeting the player, continue to.
+            -- If not, let it do whatever it's doing for now until it loses interest
+            -- and comes back for the player.
+            local origCanTarget = mob.components.combat.keeptargetfn
+            local function keepTargetOverride(inst, target)
+                if target:HasTag("player") and inst.components.combat:CanTarget(target) then
+                    return true
+                else
+                    return origCanTarget and origCanTarget(inst,target)
+                end
+            end
+            mob.components.combat:SetKeepTargetFunction(keepTargetOverride)
+            
+            -- Set the min attack period to something...higher
+            local currentAttackPeriod = mob.components.combat.min_attack_period
+            mob.components.combat:SetAttackPeriod(math.max(currentAttackPeriod,3))
+            mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+            
+            ------------------------------------------------------------------------------
         end
     end
     
@@ -262,7 +312,6 @@ local function releaseRandomMobs(self)
         self.SoundEmitter:SetParameter("earthquake","intensity",self.soundIntensity)
     end
     self.quakeMachine.MakeStampedeLouder = makeLouder
-    
     self.quakeStarted = false
     
 
@@ -302,35 +351,12 @@ local function releaseRandomMobs(self)
 			local day = GLOBAL.GetClock().numcycles
 		            
 			local theMob = GLOBAL.SpawnPrefab(prefab)
-			if theMob then                
-                -- I've modified the mobs brains to be mindless killers with this tag
-                theMob:AddTag("houndedKiller")
+			if theMob then
+                -- This fcn will add it to our list and put a bunch of stuff on it
+                self:AddMob(theMob)
 
-                
-                -- TODO: Decrease health?
- 
- 
-                -- This mob has no home anymore. It's set to kill.
-                if theMob.components.homeseeker then
-                    theMob:RemoveComponent("homeseeker")
-                end
-                
-                -- Can't remove 'sleeper' tag as it causes the entity to throw errors. Just
-                -- override the ShouldSleep functions
-                if theMob.components.sleeper ~= nil then
-                    local sleepFcn = function(self,inst)
-                        -- Super hack! Just keep suggesting this mob attacks the player.
-                        theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
-                        return false
-                    end
-                    local wakeFcn = function(self,inst)
-                        return true
-                    end
-                    theMob.components.sleeper:SetSleepTest(sleepFcn)
-                    theMob.components.sleeper:SetWakeTest(wakeFcn)
-                    
-                end
-                
+                -- This is stuff that only happens after spawn. Leave it here.
+
                 -- Mosquitos should have a random fill rate instead of all being at 0
                 if theMob:HasTag("mosquito") then
                     local fillUp = math.random(0,2)
@@ -339,55 +365,8 @@ local function releaseRandomMobs(self)
                     end
                 end
                 
-                -- Pigs might transform! Hmm, beardbunny dudes are werebeasts too
-                if theMob.components.werebeast ~= nil then
-                    theMob:AddTag("SpecialPigman")
-                end
-                
-                -- Quit trying to find a herd dumb mobs
-                if theMob.components.herdmember then
-                    theMob:RemoveComponent("herdmember")
-                end
-                
-                -- Quit trying to go home. Your home is the afterlife.
-                if theMob.components.knownlocations then
-                    theMob.components.knownlocations:ForgetLocation("home")
-                end
-                
-				
-				-- Override the default KeepTarget for this mob.
-                -- Basically, if it's currently targeting the player, continue to.
-                -- If not, let it do whatever it's doing for now until it loses interest
-                -- and comes back for the player.
-				local origCanTarget = theMob.components.combat.keeptargetfn
-				local function keepTargetOverride(inst, target)
-                    if target:HasTag("player") and inst.components.combat:CanTarget(target) then
-                        return true
-                    else
-                        return origCanTarget and origCanTarget(inst,target)
-                    end
-                end
-				theMob.components.combat:SetKeepTargetFunction(keepTargetOverride)
-                
-                -- If the player is alive...go kill them
-                --local function retargetOverride(inst)
-                --    target = GLOBAL.GetPlayer()
-                --    if inst.components.combat:CanTarget(target) then
-                --        return target
-                --    end
-                --end
-                --theMob.components.combat:SetRetargetFunction(3, retargetOverride)
-				
 				theMob.Physics:Teleport(spawn_pt:Get())
 				theMob:FacePoint(pt)
-                
-                -- Set the min attack period to something...higher
-                local currentAttackPeriod = theMob.components.combat.min_attack_period
-                print("Mob current attack period: " .. currentAttackPeriod)
-                theMob.components.combat:SetAttackPeriod(math.max(currentAttackPeriod,3))
-
-				theMob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
-                --theMob.components.combat:SetTarget(GLOBAL.GetPlayer())
                 
                 -- Stuff to do after all of the mobs are released
                 if self.houndstorelease == 0 then
@@ -398,8 +377,6 @@ local function releaseRandomMobs(self)
                     
                 end
                 
-                -- Start tracking this mob!
-                self:AddMob(theMob)
 			end
 		end
 		
@@ -432,9 +409,12 @@ local function releaseRandomMobs(self)
     
     local origOnUpdate = self.OnUpdate
     local function newOnUpdate(self,dt)
-    
+        -- Stuff to do before calling hounded:OnUpdate
         local didWarnFirst = self.announcewarningsoundinterval
+        --------------------------------------------------------
         origOnUpdate(self,dt)
+        --------------------------------------------------------
+        -- Stuff to do after calling hounded:OnUpdate
         local didWarnSecond = self.announcewarningsoundinterval
         -- Modify the next release time based on the current prefab
         if self.timetoattack <= 0 then
@@ -455,9 +435,9 @@ local function releaseRandomMobs(self)
         if MOB_LIST[self.currentIndex].prefab == "beefalo" then
             if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.quakeStarted then
 
-                local quakeTime = 4*(self.houndstorelease+1) + self.timetoattack
-                print("Starting quake for " .. tostring(quakeTime) .. " seconds")
-                
+                -- This is kind of hackey...but i want the quake to INCREASE over time, not decrease. 
+                -- The camerashake only has functions that decrease...
+                local quakeTime = 4*(self.houndstorelease+1) + self.timetoattack                
                 local interval = self.timetoattack / 2
 
                 --self.quakeMachine:DoTaskInTime(0, function(self) self:WarnQuake(interval*2, .015, .1) end)
@@ -474,6 +454,44 @@ local function releaseRandomMobs(self)
                 for i=1, 10 do
                     self.quakeMachine:DoTaskInTime(i*interval, function(self) self:MakeStampedeLouder() end)
                 end
+            end
+        -- If lightning goats are coming, start some weather effects
+        elseif MOB_LIST[self.currentIndex].prefab == "lightninggoat" then
+            if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.inst.overcastStarted then
+                -- We're in the warning interval. Lets make some clouds (only if it's day)
+                self.inst.overcastStarted = true
+                if GLOBAL.GetClock():IsDay() then
+                    self.inst.startColor = GLOBAL.GetClock().currentColour
+
+                    -- make it 50% darker?
+                    self.inst.endColor = GLOBAL.Point(0,0,0)
+                    self.inst.endColor.x = .5*self.inst.startColor.x
+                    self.inst.endColor.y = .5*self.inst.startColor.y
+                    self.inst.endColor.z = .5*self.inst.startColor.z
+                    
+                    -- Fade to a darker overcast to simulate clouds
+                    GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack)
+                    
+                    local makeCloudsGoAway = function(self)
+                        -- Don't fix the color if it went to dusk as that would break the color
+                        if GLOBAL.GetClock():IsDay() then
+                            GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
+                        end
+                        self.overcastStarted = false
+                    end
+                    -- When done...transition back to normal color
+                    self.inst:DoTaskInTime(self.timetoattack+10, makeCloudsGoAway)
+                end
+                
+                -- Schedule some distant thunder
+                local interval = self.timetoattack/5
+                for i=1,5 do
+                    self.inst:DoTaskInTime(i*interval, function(self) 
+                            GLOBAL.GetPlayer().SoundEmitter:PlaySound("dontstarve/rain/thunder_far","far_thunder") 
+                            GLOBAL.GetPlayer().SoundEmitter:SetParameter("far_thunder", "intensity", .015*i) end)
+                            
+                end
+                
             end
         end
         
@@ -522,24 +540,18 @@ local function releaseRandomMobs(self)
                 if targ then
                     -- Add this mob back to our counter
                     self:AddMob(targ.entity)
-                    
-                    -- Add the tags back to this mob
-                    targ.entity:AddTag("houndedKiller")
-                    
-                    -- Our pigs are special...they know this
-                    if targ.entity.components.werebeast then
-                        targ.entity:AddTag("SpecialPigman")
-                    end
                 end
             end
         end
     end
     
     -- Helper function to start an attack.
-    local function fn(self, prefabIndex)
+    local function fn(self,timeToAttack)
         if self.timetoattack > 31 then
-            print("Starting hound attack")
-            self.timetoattack = 18
+            -- Can Pass in the time if wanted...
+            if timeToAttack == nil then timeToAttack = 18 end
+            print("Starting hound attack in: " .. timeToAttack)
+            self.timetoattack = timeToAttack
         end
     end
     self.StartAttackNow = fn
