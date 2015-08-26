@@ -1,13 +1,15 @@
 local Vector3 = GLOBAL.Vector3
 local dlcEnabled = GLOBAL.IsDLCEnabled(GLOBAL.REIGN_OF_GIANTS)
+local SEASONS = GLOBAL.SEASONS
 
 --[[ Table is as follows:
         enabled: is this a valid prefab to use (DLC restrictions or config file)
-        RoG: Is this a Reign of Giants only mob? (Toggles enabled if DLC is not enabled). If not added, assumed to be false.
-        CaveState: "open", "used", nil - This mob will only spawn when the cavestate condition is met. If not defined, ignore
         prefab: prefab name
         brain: brain name. If a mob has this defined, will add a new PriorityNode to the brain to attack player.
                (leave this out if don't want to override brain function at all)
+        RoG: Is this a Reign of Giants only mob? (Toggles enabled if DLC is not enabled). If not added, assumed to be false.
+        CaveState: "open", "used", nil - This mob will only spawn when the cavestate condition is met. If not defined, ignore
+        Season: restricts the season(s) this can come. If not defined...can come any season. 
         mobMult: multiplier compared to normal hound values (how many to release)
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
         
@@ -24,15 +26,13 @@ local MOB_LIST =
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
     [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3},
     [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.5,timeMult=.15}, 
-    [8]  = {enabled=true,RoG=true,prefab="lightninggoat",brain="lightninggoatbrain",mobMult=.75,timeMult=1.25}, 
+    [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
-    [10] = {enabled=true,prefab="bat",CaveState="open",brain="batbrain",mobMult=1,timeMult=1},
-    [11] = {enabled=true,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, 
-    [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1}, 
+    [10] = {enabled=true,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1},
+    [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, 
+    [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5}, 
+    [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},mobMult=1,timeMult=1}, -- Needs work. They wont get enraged.
 }
-
--- This is for debugging. Set to random when launching the game.
---local currentIndex = 9
 
 -- Check the config file and the DLC to disable some of the mobs
 local function disableMobs()
@@ -52,6 +52,8 @@ local function disableMobs()
     end
 end
 disableMobs()
+
+
 --[[ -----------------------------------------------------
   Update strings for warnings. 
   TODO: Add updates for all characters
@@ -91,7 +93,7 @@ local function updateWarningString(index)
     elseif prefab == "merm" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh god, it smells like rotting fish"
     elseif prefab == "spider" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a million tiny legs getting closer and closer"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a million tiny legs"
     elseif prefab == "tallbird" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a murder...of tall birds"
     elseif prefab == "pigman" then
@@ -111,6 +113,8 @@ local function updateWarningString(index)
     elseif prefab == "bat" then
         -- TODO: Increment the count each warning lol
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = getDumbString(warningCount) .. " Ah ah ah!"
+    elseif prefab == "knight" then
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Incomming old people music...and horses?"
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
@@ -132,8 +136,8 @@ local function getRandomMob()
     end
     
     -- Return the first one that is enabled
-    -- TODO: Make this more flexible for more spawn restrictions so it doesn't get super messy
     for k,v in pairs(t) do
+        local pickThisMob = true
         if MOB_LIST[v].enabled then
             -- Check the various conditions
             if MOB_LIST[v].CaveState ~= nil then
@@ -141,10 +145,10 @@ local function getRandomMob()
                 caveUsed = GLOBAL.ProfileStatsGet("cave_entrance_used")
                 if MOB_LIST[v].CaveState == "open" and caveOpen ~= nil and caveOpen == true then
                     print("Cave open. Returning " .. tostring(MOB_LIST[v].prefab))
-                    return v
+                    pickThisMob = true
                 elseif MOB_LIST[v].CaveState == "used" and caveUsed ~= nil and caveUsed == true then
                     print("Cave used. Returning " .. tostring(MOB_LIST[v].prefab))
-                    return v
+                    pickThisMob = true
                 else
                     print("Skipping " .. tostring(MOB_LIST[v].prefab) .. " as mob because cavestate not met")
                     if caveOpen ~= nil then
@@ -153,18 +157,38 @@ local function getRandomMob()
                     if caveUsed ~= nil then
                         print("CaveUsed: " .. tostring(caveUsed))
                     end    
-                       
+                    
+                    pickThisMob = false
                 end
-            else
-                return v
+            end
+            
+            -- Check for season restrictions
+            if MOB_LIST[v].Season ~= nil then
+                for key,season in pairs(MOB_LIST[v].Season) do
+                    if GLOBAL.GetSeasonManager().current_season ~= season then
+                        pickThisMob = false
+                    else
+                        pickThisMob = true
+                        break
+                    end
+                end
+                
+                if not pickThisMob then
+                    print("Skipping " .. tostring(MOB_LIST[v].prefab) .. " as mob because season not met")
+                end
+            end
+            
+            -- If this is still true, return this selection 
+            if pickThisMob then 
+                return v 
             end
         end
     end
 
-    -- If we are here...there is NOTHING in the list enabled.
+    -- If we are here...there is NOTHING in the list enabled and valid.
     -- This is strange. Just return hound I guess (even though
     -- hound is in the list and the user disabled it...)
-    print("WARNING: No mobs enabled in config! Using Hound as default")
+    print("WARNING: No possible mobs to select from! Using Hound as default")
     return 1
 end
 
@@ -212,9 +236,10 @@ local function releaseRandomMobs(self)
             self.inst:ListenForEvent("death", mob.deathfn,mob)
             self.inst:ListenForEvent("onremove", mob.deathfn, mob )
             
-            
+            ---------------------------------------------------------------------------------
             --Add All of the stuff for this mob here so we can persist on save states----
-                            -- I've modified the mobs brains to be mindless killers with this tag
+            
+            -- I've modified the mobs brains to be mindless killers with this tag
             mob:AddTag("houndedKiller")
 
             -- This mob has no home anymore. It's set to kill.
@@ -244,9 +269,10 @@ local function releaseRandomMobs(self)
             end
             
             -- Quit trying to find a herd dumb mobs
-            if mob.components.herdmember then
-                mob:RemoveComponent("herdmember")
-            end
+               -- or not...some prefabs kind of assume this is set
+            --if mob.components.herdmember then
+            --    mob:RemoveComponent("herdmember")
+            --end
             
             -- Quit trying to go home. Your home is the afterlife.
             if mob.components.knownlocations then
