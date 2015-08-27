@@ -619,6 +619,8 @@ local function releaseRandomMobs(self)
         if self.currentIndex == nil then
             print("Could not load index. Planning next attack")
             self:PlanNextHoundAttack()
+		else
+			updateWarningString(self.currentIndex)
         end
     end
     self.OnLoad = newOnLoad
@@ -680,6 +682,8 @@ local function MakeMobChasePlayer(brain)
     --[[ Make this the top of the priority node. Basically, if they have the 
          insane tag (we add it above), they will prioritize chasing and attempting 
          to kill the player before doing normal things.
+		 
+		 Update - maybe should make all mobs attack walls now since they are crazy
     --]]
 
     local function KillKillDieDie(inst)
@@ -688,7 +692,9 @@ local function MakeMobChasePlayer(brain)
         return ret
     end
     
+	attackWall = GLOBAL.WhileNode(function() return true end, "Get The Coward", GLOBAL.AttackWall(brain.inst) )
     chaseAndKill = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Kill Kill", KillKillDieDie(brain.inst))
+	
     
     -- Find the root node. Insert this WhileNode at the top.
     -- Well, we'll put it after "OnFire" (if it exists) so it will still panic if on fire
@@ -701,7 +707,8 @@ local function MakeMobChasePlayer(brain)
     end
        
     -- If it wasn't found, it will be 0. Thus, inserting at 1 will be the first thing
-    table.insert(brain.bt.root.children, fireindex+1, chaseAndKill)
+	table.insert(brain.bt.root.children, fireindex+1, attackWall)
+    table.insert(brain.bt.root.children, fireindex+2, chaseAndKill)
     
     -- Debug string to see that my KillKillDieDie was added
     
