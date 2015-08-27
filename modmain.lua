@@ -160,10 +160,8 @@ local function getRandomMob()
                 caveOpen = GLOBAL.ProfileStatsGet("cave_entrance_opened")
                 caveUsed = GLOBAL.ProfileStatsGet("cave_entrance_used")
                 if MOB_LIST[v].CaveState == "open" and caveOpen ~= nil and caveOpen == true then
-                    print("Cave open. Returning " .. tostring(MOB_LIST[v].prefab))
                     pickThisMob = true
                 elseif MOB_LIST[v].CaveState == "used" and caveUsed ~= nil and caveUsed == true then
-                    print("Cave used. Returning " .. tostring(MOB_LIST[v].prefab))
                     pickThisMob = true
                 else
                     print("Skipping " .. tostring(MOB_LIST[v].prefab) .. " as mob because cavestate not met")
@@ -340,12 +338,11 @@ local function releaseRandomMobs(self)
 					return not guy:HasTag("wall") and not guy:HasTag("houndedKiller") and inst.components.combat:CanTarget(guy)
 					end)
 				if thing then
-					print(tostring(inst.name) .. " retargetfn, targeting " .. tostring(thing.name))
 					return thing
 				end
 			end
 			
-			-- Boy...bats did not like me overriding their retarget fcn. 
+			-- TODO: Get this to work
 			--if not mob.components.teamattacker then
 			--	mob.components.combat:SetRetargetFunction(3, retargetfn)
 			--end
@@ -358,13 +355,10 @@ local function releaseRandomMobs(self)
 			local index = getIndexByName(mob.prefab)
 			if index and MOB_LIST[index].damageMult then
 				local mult = MOB_LIST[index].damageMult
-				print("Adding damage multipler of " .. mult .. " to " .. mob.prefab)
 				mob.components.combat:SetDefaultDamage(mult*mob.components.combat.defaultdamage)
 			end
             
             ------------------------------------------------------------------------------
-		else
-			print("Could not add mob to list")
         end
     end
     
@@ -517,9 +511,9 @@ local function releaseRandomMobs(self)
         else
             self.currentIndex = getRandomMob()
         end
-        print("Picked " .. MOB_LIST[self.currentIndex].prefab .. " as next mob")
+
         self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[self.currentIndex].mobMult)
-        print("Number scheduled to be released: " .. self.houndstorelease)
+		print("Next Attack: " .. self.houndstorelease .. " " .. MOB_LIST[self.currentIndex].prefab)
         updateWarningString(self.currentIndex)
         
         -- Reset the warning counter
@@ -584,12 +578,10 @@ local function releaseRandomMobs(self)
                 self.inst.overcastStarted = true
                 if GLOBAL.GetClock():IsDay() then
                     self.inst.startColor = GLOBAL.GetClock().currentColour
-					print("Start/Clouds/End")
 					print(self.inst.startColor)
 					
 					-- Get the curent cloud cover
 					currentClouds = GLOBAL.GetSeasonManager():GetWeatherLightPercent()
-					print("Current cloud cover percent: " .. (1-currentClouds))
 					
 					-- If there is more than 50% cloud cover...don't make it even darker!
 					if (1-currentClouds) < .5 then
@@ -603,7 +595,7 @@ local function releaseRandomMobs(self)
 						self.inst.endColor.x = .5*currentClouds*self.inst.startColor.x
 						self.inst.endColor.y = .5*currentClouds*self.inst.startColor.y
 						self.inst.endColor.z = .5*currentClouds*self.inst.startColor.z
-						print(self.inst.endColor)
+
 						
 						-- Make it darker
 						GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-8)
@@ -618,8 +610,6 @@ local function releaseRandomMobs(self)
 						-- When done...transition back to normal color
 						local cloudTime = 8*(self.houndstorelease+1) + self.timetoattack
 						self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
-					else
-						print("Dark enough already. Not making darker")
 					end
                 end
                 
@@ -691,7 +681,7 @@ local function releaseRandomMobs(self)
     local function fn(self,timeToAttack)
         if self.timetoattack > 31 then
             -- Can Pass in the time if wanted...
-            if timeToAttack == nil then timeToAttack = 18 end
+            if timeToAttack == nil then timeToAttack = 30 end
             print("Starting hound attack in: " .. timeToAttack)
             self.timetoattack = timeToAttack
         end
@@ -760,13 +750,13 @@ local function MakeMobChasePlayer(brain)
 	table.insert(brain.bt.root.children, fireindex+1, attackWall)
 
     
-    
+    -- The plan was to give the players a small break by having the mobs stop for a snack...but they don't 
+	-- ever seem to want to to id. TODO!
 	-- Make the mobs have a snack every so often
 	local function EatFoodAction(inst)
 		if inst.components.eater then
 			local target = GLOBAL.FindEntity(inst, 30, function(item) return inst.components.eater:CanEat(item) and item:IsOnValidGround() end)
 			if target then
-				print(tostring(inst.name) .. "....Im gonna eat that " .. tostring(target.name))
 				return GLOBAL.BufferedAction(inst, target, GLOBAL.ACTIONS.EAT)
 			end
 		end
@@ -783,6 +773,7 @@ local function MakeMobChasePlayer(brain)
         end
     end
 	
+	-- TODO: Fix snack code
 	if false then
 		if not hasAction then
 			-- Just insert at end
@@ -803,11 +794,9 @@ end
 for k,v in pairs(MOB_LIST) do
     local skip
     if v.brain and (not dlcEnabled and v.RoG) then
-        print("Skipping insert of " .. tostring(v.brain) .. " because DLC is not enabled")
         skip = true
     end
     if v.brain and not skip then
-        print("Adding modified brain to " .. tostring(v.brain))
         AddBrainPostInit(v.brain,MakeMobChasePlayer)
     end
 end
@@ -817,10 +806,10 @@ end
 ---------------------------------------------------------------------------
 local function firstTimeLoad()
     if GLOBAL.GetWorld().components.hounded.currentIndex == nil then
-        print("First time loading this mod. Generating new hound attack")   
+        print("First time loading this mod. Generating new hound attack.")   
         GLOBAL.GetWorld().components.hounded:PlanNextHoundAttack()
     else
-        print("currentIndex: " .. GLOBAL.GetWorld().components.hounded.currentIndex)
+        print("Current Mob Planned: " .. MOB_LIST[GLOBAL.GetWorld().components.hounded.currentIndex].prefab)
     end
 end
 AddSimPostInit(function() firstTimeLoad() end)
