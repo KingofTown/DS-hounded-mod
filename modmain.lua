@@ -12,6 +12,7 @@ local SEASONS = GLOBAL.SEASONS
         Season: restricts the season(s) this can come. If not defined...can come any season. 
         mobMult: multiplier compared to normal hound values (how many to release)
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
+		damageMult: how much damage it does compared to normal mob
         
         TODO: Have health defined here? It's a bit much fighing one of these sometimes...multiple seems impossible
         
@@ -28,11 +29,22 @@ local MOB_LIST =
     [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.5,timeMult=.15}, 
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
-    [10] = {enabled=true,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1},
+    [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1}, -- TODO: Bats crash game when attacked by other things.
     [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, -- These dudes don't work too well (mostly works, but they get lost)
     [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5}, 
     [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},mobMult=1,timeMult=1}, -- Needs work. They wont get enraged. Also spawns moosegoose....so yeah
+	[14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25},
+	[15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,timeMult=.35,damageMult=.5},
 }
+
+-- Lookup the table index by prefab name. Returns nil if not found
+local function getIndexByName(name)
+	for k,v in pairs(MOB_LIST) do
+		if v.prefab == name then
+			return k
+		end
+	end
+end
 
 -- Check the config file and the DLC to disable some of the mobs
 local function disableMobs()
@@ -114,7 +126,11 @@ local function updateWarningString(index)
         -- TODO: Increment the count each warning lol
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = getDumbString(warningCount) .. " Ah ah ah!"
     elseif prefab == "knight" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Incomming old people music...and horses?"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "The cavalry are coming!"
+	elseif prefab == "perd" then
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Gobbles!!!"
+	elseif prefab == "penguin" then
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh no...they think I took their eggs!"
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
@@ -236,6 +252,7 @@ local function releaseRandomMobs(self)
 
     self.AddMob = function(self,mob)
         if self.currentMobs[mob] == nil and mob then
+
             self.currentMobs[mob] = true
             self.numMobsSpawned = self.numMobsSpawned + 1
             -- Listen for death events on these dudes
@@ -250,6 +267,7 @@ local function releaseRandomMobs(self)
             
             -- I've modified the mobs brains to be mindless killers with this tag
             mob:AddTag("houndedKiller")
+			mob:AddTag("hostile") -- seems natural to set this
 
             -- This mob has no home anymore. It's set to kill.
             if mob.components.homeseeker then
@@ -268,6 +286,7 @@ local function releaseRandomMobs(self)
 						   "Should I sleep?"
 						   "NO! Attack that guy!"
 					--]]
+					-- TODO: Seeing what happens when this is gone.
                     mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
                     return false
                 end
@@ -301,7 +320,11 @@ local function releaseRandomMobs(self)
             -- and comes back for the player.
             local origCanTarget = mob.components.combat.keeptargetfn
             local function keepTargetOverride(inst, target)
-				-- TODO: Check distance of player?
+				-- TODO: Testing this 
+				if true then
+					return inst.components.combat:CanTarget(target)
+				end
+				-- This wont get hit. Was original code. TODO : if above is better, remove this.
                 if target:HasTag("player") and inst.components.combat:CanTarget(target) then
                     return true
                 else
@@ -309,13 +332,39 @@ local function releaseRandomMobs(self)
                 end
             end
             mob.components.combat:SetKeepTargetFunction(keepTargetOverride)
+			
+			-- Let's try this out. Give the players a chance. Basically, the mobs will look for something 
+			-- else to attack every once in a while...
+			local function retargetfn(inst)
+				thing =  GLOBAL.FindEntity(inst, 20, function(guy) 
+					return not guy:HasTag("wall") and not guy:HasTag("houndedKiller") and inst.components.combat:CanTarget(guy)
+					end)
+				if thing then
+					print(tostring(inst.name) .. " retargetfn, targeting " .. tostring(thing.name))
+					return thing
+				end
+			end
+			
+			-- Boy...bats did not like me overriding their retarget fcn. 
+			--if not mob.components.teamattacker then
+			--	mob.components.combat:SetRetargetFunction(3, retargetfn)
+			--end
             
             -- Set the min attack period to something...higher
             local currentAttackPeriod = mob.components.combat.min_attack_period
             mob.components.combat:SetAttackPeriod(math.max(currentAttackPeriod,3))
             mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+			
+			local index = getIndexByName(mob.prefab)
+			if index and MOB_LIST[index].damageMult then
+				local mult = MOB_LIST[index].damageMult
+				print("Adding damage multipler of " .. mult .. " to " .. mob.prefab)
+				mob.components.combat:SetDefaultDamage(mult*mob.components.combat.defaultdamage)
+			end
             
             ------------------------------------------------------------------------------
+		else
+			print("Could not add mob to list")
         end
     end
     
@@ -336,6 +385,7 @@ local function releaseRandomMobs(self)
         -- Increase the intensity for the next call (only start the sound once)
         if not self.quakeStarted then
             self.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
+			self.quakeStarted = true
         end
         self.SoundEmitter:SetParameter("earthquake", "intensity", self.soundIntensity)
         
@@ -519,9 +569,10 @@ local function releaseRandomMobs(self)
                 --self.quakeMachine:WarnQuake(quakeTime)
                 self.quakeStarted = true
                 
-                -- Schedule volume increases. Want at least 10 of them
-                local interval = self.timetoattack/10
-                for i=1, 10 do
+				-- This is a hack too...
+                -- Schedule volume increases. Want at least 5 of them
+                local interval = self.timetoattack/5
+                for i=1, 5 do
                     self.quakeMachine:DoTaskInTime(i*interval, function(self) self:MakeStampedeLouder() end)
                 end
             end
@@ -687,12 +738,11 @@ local function MakeMobChasePlayer(brain)
     --]]
 
     local function KillKillDieDie(inst)
-		-- Chase for 80 seconds, target distance 60
-        ret = GLOBAL.ChaseAndAttack(inst,80,60)
-        return ret
+		-- Chase for 60 seconds, target distance 60
+        return GLOBAL.ChaseAndAttack(inst,60,60)
     end
     
-	attackWall = GLOBAL.WhileNode(function() return true end, "Get The Coward", GLOBAL.AttackWall(brain.inst) )
+	attackWall = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Get The Coward", GLOBAL.AttackWall(brain.inst) )
     chaseAndKill = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Kill Kill", KillKillDieDie(brain.inst))
 	
     
@@ -702,16 +752,46 @@ local function MakeMobChasePlayer(brain)
     for i,node in ipairs(brain.bt.root.children) do
         if node.name == "Parallel" and node.children[1].name == "OnFire" then
             fireindex = i
-            break
         end
     end
        
-    -- If it wasn't found, it will be 0. Thus, inserting at 1 will be the first thing
+    -- Tell the brain "Attack the player...unless there is a wall in the way, get that instead"
+	table.insert(brain.bt.root.children, fireindex+1, chaseAndKill)
 	table.insert(brain.bt.root.children, fireindex+1, attackWall)
-    table.insert(brain.bt.root.children, fireindex+2, chaseAndKill)
+
     
+    
+	-- Make the mobs have a snack every so often
+	local function EatFoodAction(inst)
+		if inst.components.eater then
+			local target = GLOBAL.FindEntity(inst, 30, function(item) return inst.components.eater:CanEat(item) and item:IsOnValidGround() end)
+			if target then
+				print(tostring(inst.name) .. "....Im gonna eat that " .. tostring(target.name))
+				return GLOBAL.BufferedAction(inst, target, GLOBAL.ACTIONS.EAT)
+			end
+		end
+	end
+	haveASnack = GLOBAL.DoAction(brain.inst, EatFoodAction, "Eat Food", true )
+	
+	-- If the brain already has this...don't add it again. Else, add it to the end
+    local hasAction = false
+    for i,node in ipairs(brain.bt.root.children) do
+        if node.name == "Parallel" and node.children[1].name == "Eat Food" then
+			-- Already eats...don't add it again
+            hasAction = true
+            break
+        end
+    end
+	
+	if false then
+		if not hasAction then
+			-- Just insert at end
+			table.insert(brain.bt.root.children, haveASnack)
+		end
+	end
+	
     -- Debug string to see that my KillKillDieDie was added
-    
+    --print("Brain for " .. tostring(brain.inst.name))
     --for i,node in ipairs(brain.bt.root.children) do
     --    print("\t"..node.name.." > "..(node.children and node.children[1].name or ""))
     --end

@@ -1,10 +1,10 @@
 -- Mod Settings
 name = "Super Hound Waves"
-description = "Occasional Hound attack getting boring? Try this out. Each hound attack will instead" ..
+description = "Are the occasional Hound attack getting boring? Try this out. Each hound attack will instead" ..
               " be an attack from a random mob selected from the configuration file.\n" ..
 			  "Surprises await those brave enough to try it out."
 author = "KingofTown"
-version = "0.1"
+version = "1.1"
 forumthread = "None"
 icon_atlas = "modicon.xml"
 icon = "modicon.tex"
@@ -119,6 +119,24 @@ configuration_options =
 	{
 		name = "knight",
 		label = "Clockwork Knights",
+		options =	{
+						{description = "On", data = "default"},
+						{description = "Off", data = "off"},
+					},
+		default = "default",
+	},
+	{
+		name = "perd",
+		label = "Turkeys",
+		options =	{
+						{description = "On", data = "default"},
+						{description = "Off", data = "off"},
+					},
+		default = "default",
+	},
+	{
+		name = "penguin",
+		label = "Penguins!",
 		options =	{
 						{description = "On", data = "default"},
 						{description = "Off", data = "off"},
