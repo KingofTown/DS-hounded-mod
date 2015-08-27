@@ -387,8 +387,8 @@ local function releaseRandomMobs(self)
     self.quakeMachine.WarnQuake = stampedeShake
     
     local function endStampedeShake(self)
-        self.quake = false
-        self.emittingsound = false
+		print("Ending quake sound fx")
+		self.quakeStarted = false
         self.SoundEmitter:KillSound("earthquake")
         self.soundIntensity = 0.01
     end
@@ -539,10 +539,6 @@ local function releaseRandomMobs(self)
                 self.calcNextReleaseTime = false
             end
             
-            if self.quakeStarted then
-                self.quakeMachine:DoTaskInTime(5, function(self) self:EndQuake() end)
-                self.quakeStarted = false
-            end
         end
         
         -- If beefalo are coming, start the stampede effects
@@ -550,8 +546,7 @@ local function releaseRandomMobs(self)
             if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.quakeStarted then
 
                 -- This is kind of hackey...but i want the quake to INCREASE over time, not decrease. 
-                -- The camerashake only has functions that decrease...
-                local quakeTime = 4*(self.houndstorelease+1) + self.timetoattack                
+                -- The camerashake only has functions that decrease...            
                 local interval = self.timetoattack / 2
 
                 --self.quakeMachine:DoTaskInTime(0, function(self) self:WarnQuake(interval*2, .015, .1) end)
@@ -560,15 +555,15 @@ local function releaseRandomMobs(self)
                 self.quakeMachine:DoTaskInTime(1*interval, function(self) self:WarnQuake(interval*2, .02, .1) end)
                 self.quakeMachine:DoTaskInTime(2*interval, function(self) self:WarnQuake(interval*2, .025, .1) end)
 
-                --self.quakeMachine:WarnQuake(quakeTime)
                 self.quakeStarted = true
                 
-				-- This is a hack too...
-                -- Schedule volume increases. Want at least 5 of them
                 local interval = self.timetoattack/5
                 for i=1, 5 do
                     self.quakeMachine:DoTaskInTime(i*interval, function(self) self:MakeStampedeLouder() end)
                 end
+				
+				-- Schedule quake to end
+				self.quakeMachine:DoTaskInTime(self.timetoattack+5, function(self) self:EndQuake() end)
             end
         -- If lightning goats are coming, start some weather effects
         elseif MOB_LIST[self.currentIndex].prefab == "lightninggoat" then
