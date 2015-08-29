@@ -543,7 +543,7 @@ local function releaseRandomMobs(self)
         
         -- If beefalo are coming, start the stampede effects
         if MOB_LIST[self.currentIndex].prefab == "beefalo" then
-            if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.quakeStarted then
+            if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.quakeMachine.quakeStarted then
 
                 -- This is kind of hackey...but i want the quake to INCREASE over time, not decrease. 
                 -- The camerashake only has functions that decrease...            
@@ -555,7 +555,7 @@ local function releaseRandomMobs(self)
                 self.quakeMachine:DoTaskInTime(1*interval, function(self) self:WarnQuake(interval*2, .02, .1) end)
                 self.quakeMachine:DoTaskInTime(2*interval, function(self) self:WarnQuake(interval*2, .025, .1) end)
 
-                self.quakeStarted = true
+                self.quakeMachine.quakeStarted = true
                 
                 local interval = self.timetoattack/5
                 for i=1, 5 do
