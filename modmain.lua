@@ -13,6 +13,7 @@ local SEASONS = GLOBAL.SEASONS
         mobMult: multiplier compared to normal hound values (how many to release)
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
 		damageMult: how much damage it does compared to normal mob
+		healthMult: how much health it has compared to its normal self
         
         TODO: Have health defined here? It's a bit much fighing one of these sometimes...multiple seems impossible
         
@@ -26,7 +27,7 @@ local MOB_LIST =
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
     [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.5,timeMult=.15}, 
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,timeMult=.13,damageMult=2.2},
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
     [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1}, -- TODO: Bats crash game when attacked by other things.
