@@ -438,7 +438,7 @@ local function releaseRandomMobs(self)
 			-- If hounds...maybe have some fire or ice
 			if prefab == "hound" then 
 				if math.random() < specialMobChance then
-					if GetSeasonManager():IsWinter() then
+					if GLOBAL.GetSeasonManager():IsWinter() then
 						prefab = "icehound"
 					else
 						prefab = "firehound"
