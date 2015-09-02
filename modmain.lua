@@ -801,12 +801,15 @@ end
 -- Generate a new special hound effect if this has never been loaded before
 ---------------------------------------------------------------------------
 local function firstTimeLoad()
-    if GLOBAL.GetWorld().components.hounded.currentIndex == nil then
-        print("First time loading this mod. Generating new hound attack.")   
-        GLOBAL.GetWorld().components.hounded:PlanNextHoundAttack()
-    else
-        print("Current Mob Planned: " .. MOB_LIST[GLOBAL.GetWorld().components.hounded.currentIndex].prefab)
-    end
+	-- Don't load anything if in a cave
+	if not GLOBAL.GetWorld():IsCave() then
+		if GLOBAL.GetWorld().components.hounded.currentIndex == nil then
+			print("First time loading this mod. Generating new hound attack.")   
+			GLOBAL.GetWorld().components.hounded:PlanNextHoundAttack()
+		else
+			print("Current Mob Planned: " .. MOB_LIST[GLOBAL.GetWorld().components.hounded.currentIndex].prefab)
+		end
+	end
 end
 AddSimPostInit(function() firstTimeLoad() end)
 
