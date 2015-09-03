@@ -12,8 +12,8 @@ local SEASONS = GLOBAL.SEASONS
         Season: restricts the season(s) this can come. If not defined...can come any season. 
         mobMult: multiplier compared to normal hound values (how many to release)
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
-		damageMult: how much damage it does compared to normal mob
-		healthMult: how much health it has compared to its normal self
+        damageMult: how much damage it does compared to normal mob
+        healthMult: how much health it has compared to its normal self
         
         TODO: Have health defined here? It's a bit much fighing one of these sometimes...multiple seems impossible
         
@@ -34,17 +34,17 @@ local MOB_LIST =
     [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, -- These dudes don't work too well (mostly works, but they get lost)
     [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5}, 
     [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},mobMult=1,timeMult=1}, -- Needs work. They wont get enraged. Also spawns moosegoose....so yeah
-	[14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25},
-	[15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,timeMult=.35,damageMult=.5},
+    [14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25},
+    [15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,timeMult=.35,damageMult=.5},
 }
 
 -- Lookup the table index by prefab name. Returns nil if not found
 local function getIndexByName(name)
-	for k,v in pairs(MOB_LIST) do
-		if v.prefab == name then
-			return k
-		end
-	end
+    for k,v in pairs(MOB_LIST) do
+        if v.prefab == name then
+            return k
+        end
+    end
 end
 
 -- Check the config file and the DLC to disable some of the mobs
@@ -128,9 +128,9 @@ local function updateWarningString(index)
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = getDumbString(warningCount) .. " Ah ah ah!"
     elseif prefab == "knight" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "The cavalry are coming!"
-	elseif prefab == "perd" then
+    elseif prefab == "perd" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Gobbles!!!"
-	elseif prefab == "penguin" then
+    elseif prefab == "penguin" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh no...they think I took their eggs!"
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
@@ -192,15 +192,15 @@ local function getRandomMob()
                     print("Skipping " .. tostring(MOB_LIST[v].prefab) .. " as mob because season not met")
                 end
             end
-			
-			-- Don't do spiders if the player is a 'spiderwhisperer' (webber)
-			-- Note, these spiders won't follow the spiderhat like normal ones.
-			if MOB_LIST[v].prefab == "spider" then
-				if GLOBAL.GetPlayer() and GLOBAL.GetPlayer():HasTag("spiderwhisperer") then
-					print("Not picking spiders...the player is a spiderwhisperer!")
-					pickThisMob = false
-				end
-			end
+            
+            -- Don't do spiders if the player is a 'spiderwhisperer' (webber)
+            -- Note, these spiders won't follow the spiderhat like normal ones.
+            if MOB_LIST[v].prefab == "spider" then
+                if GLOBAL.GetPlayer() and GLOBAL.GetPlayer():HasTag("spiderwhisperer") then
+                    print("Not picking spiders...the player is a spiderwhisperer!")
+                    pickThisMob = false
+                end
+            end
             
             -- If this is still true, return this selection 
             if pickThisMob then 
@@ -222,16 +222,11 @@ local function transformThings(inst)
     local playPos = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
     local naughtyPigs = TheSim:FindEntities(playPos.x,playPos.y,playPos.z, 80, {"SpecialPigman"})
     for k,v in pairs(naughtyPigs) do 
-        --print("Pushing event for " .. tostring(v))
         local pigPos = Vector3(v.Transform:GetWorldPosition())
         -- Strike lightning on pig (make it not burnable first)
         v:RemoveComponent("burnable")
         GLOBAL.GetSeasonManager():DoLightningStrike(pigPos)
-        -- If we add it too fast, they will be on fire but not showing fire...
         v:DoTaskInTime(1, function(inst) inst:AddComponent("burnable") end)
-        
-        --GLOBAL.GetSeasonManager():DoMediumLightning()
-        -- tranform
         v:PushEvent("transform_special_pigs",{inst=v})
     end
 end
@@ -266,7 +261,7 @@ local function releaseRandomMobs(self)
             
             -- I've modified the mobs brains to be mindless killers with this tag
             mob:AddTag("houndedKiller")
-			mob:AddTag("hostile") -- seems natural to set this
+            mob:AddTag("hostile") -- seems natural to set this
 
             -- This mob has no home anymore. It's set to kill.
             if mob.components.homeseeker then
@@ -278,14 +273,14 @@ local function releaseRandomMobs(self)
             if mob.components.sleeper ~= nil then
                 local sleepFcn = function(self,inst)
                     --[[ Just keep suggesting this mob attacks the player. These are 
-					     merciless killers after all.
-					       "Should I sleep?"
-					       "NO! Attack that guy!"
-					       ...
-						   "Should I sleep?"
-						   "NO! Attack that guy!"
-					--]]
-					-- TODO: Seeing what happens when this is gone.
+                         merciless killers after all.
+                           "Should I sleep?"
+                           "NO! Attack that guy!"
+                           ...
+                           "Should I sleep?"
+                           "NO! Attack that guy!"
+                    --]]
+                    -- TODO: Seeing what happens when this is gone.
                     mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
                     return false
                 end
@@ -319,11 +314,11 @@ local function releaseRandomMobs(self)
             -- and comes back for the player.
             local origCanTarget = mob.components.combat.keeptargetfn
             local function keepTargetOverride(inst, target)
-				-- TODO: Testing this 
-				if true then
-					return inst.components.combat:CanTarget(target)
-				end
-				-- This wont get hit. Was original code. TODO : if above is better, remove this.
+                -- TODO: Testing this 
+                if true then
+                    return inst.components.combat:CanTarget(target)
+                end
+                -- This wont get hit. Was original code. TODO : if above is better, remove this.
                 if target:HasTag("player") and inst.components.combat:CanTarget(target) then
                     return true
                 else
@@ -331,37 +326,44 @@ local function releaseRandomMobs(self)
                 end
             end
             mob.components.combat:SetKeepTargetFunction(keepTargetOverride)
-			
-			-- Let's try this out. Give the players a chance. Basically, the mobs will look for something 
-			-- else to attack every once in a while...
-			local function retargetfn(inst)
-				thing =  GLOBAL.FindEntity(inst, 20, function(guy) 
-					return not guy:HasTag("wall") and not guy:HasTag("houndedKiller") and inst.components.combat:CanTarget(guy)
-					end)
-				if thing then
-					return thing
-				end
-			end
-			
-			-- TODO: Get this to work
-			--if not mob.components.teamattacker then
-			--	mob.components.combat:SetRetargetFunction(3, retargetfn)
-			--end
+            
+            -- Let's try this out. Give the players a chance. Basically, the mobs will look for something 
+            -- else to attack every once in a while...
+            local function retargetfn(inst)
+                thing =  GLOBAL.FindEntity(inst, 20, function(guy) 
+                    return not guy:HasTag("wall") and not guy:HasTag("houndedKiller") and inst.components.combat:CanTarget(guy)
+                    end)
+                if thing then
+                    return thing
+                end
+            end
+            
+            -- TODO: Get this to work
+            --if not mob.components.teamattacker then
+            --  mob.components.combat:SetRetargetFunction(3, retargetfn)
+            --end
             
             -- Set the min attack period to something...higher
             local currentAttackPeriod = mob.components.combat.min_attack_period
             mob.components.combat:SetAttackPeriod(math.max(currentAttackPeriod,3))
             mob.components.combat:SuggestTarget(GLOBAL.GetPlayer())
-			
-			local index = getIndexByName(mob.prefab)
-			if index and MOB_LIST[index].damageMult then
-				local mult = MOB_LIST[index].damageMult
-				mob.components.combat:SetDefaultDamage(mult*mob.components.combat.defaultdamage)
-			end
+            
+            -- Tweak the damage output of this mob based on the table
+            local index = getIndexByName(mob.prefab)
+            if index and MOB_LIST[index].damageMult then
+                local mult = MOB_LIST[index].damageMult
+                mob.components.combat:SetDefaultDamage(mult*mob.components.combat.defaultdamage)
+            end
+            
+            -- Tweak the health of this mob based on the table
+            if index and MOB_LIST[index].healthMult then
+                local mult = MOB_LIST[index].healthMult
+                mob.components.health:SetMaxHealth(mult*mob.components.health.maxhealth)
+            end
             
             ------------------------------------------------------------------------------
         end
-    end
+    end -- end AddMob fcn
     
     
     self.RemoveMob = function(self,mob)
@@ -372,7 +374,7 @@ local function releaseRandomMobs(self)
     end
     -----------------------------------------------------------------
     
-    -- Override the quake functions to only shake camera and play/stop the madness
+    -- Create some quake effects
     local function stampedeShake(self, duration, speed, scale)
                              -- type,duration,speed,scale,maxdist
         GLOBAL.TheCamera:Shake("FULL", duration, speed, scale, 80)
@@ -380,7 +382,7 @@ local function releaseRandomMobs(self)
         -- Increase the intensity for the next call (only start the sound once)
         if not self.quakeStarted then
             self.SoundEmitter:PlaySound("dontstarve/cave/earthquake", "earthquake")
-			self.quakeStarted = true
+            self.quakeStarted = true
         end
         self.SoundEmitter:SetParameter("earthquake", "intensity", self.soundIntensity)
         
@@ -388,8 +390,7 @@ local function releaseRandomMobs(self)
     self.quakeMachine.WarnQuake = stampedeShake
     
     local function endStampedeShake(self)
-		print("Ending quake sound fx")
-		self.quakeStarted = false
+        self.quakeStarted = false
         self.SoundEmitter:KillSound("earthquake")
         self.soundIntensity = 0.01
     end
@@ -401,11 +402,12 @@ local function releaseRandomMobs(self)
     end
     self.quakeMachine.MakeStampedeLouder = makeLouder
     self.quakeStarted = false
+
     
 
-	local function ReleasePrefab(dt)
-		local pt = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
-		local spawn_pt = self:GetSpawnPoint(pt)
+    local function ReleasePrefab(dt)
+        local pt = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
+        local spawn_pt = self:GetSpawnPoint(pt)
 
         if self.currentIndex == nil then
             -- Next wave hasn't been planned
@@ -415,48 +417,45 @@ local function releaseRandomMobs(self)
         end
         
         --print("HERE COMES A " .. prefab)
-		
-		if spawn_pt then
+        
+        if spawn_pt then
             -- TODO: Add a counter to the different mob types to modify how many come
-			self.houndstorelease = self.houndstorelease - 1
+            self.houndstorelease = self.houndstorelease - 1
             
             -- Because I keep spawning them in the console...
             if self.houndstorelease <= 0 then 
                 self.houndstorelease = 0
             end
-			
-			-- Increase chances of special mobs later on
-			local specialMobChance = self:GetSpecialHoundChance()
+            
+            -- Increase chances of special mobs later on
+            local specialMobChance = self:GetSpecialHoundChance()
             
             -- If spiders...give a chance at warrior spiders
             if prefab == "spider" and math.random() < specialMobChance then
                 prefab = "spider_warrior"
             end
-			
 
-			
-			-- If hounds...maybe have some fire or ice
-			if prefab == "hound" then 
-				if math.random() < specialMobChance then
-					if GLOBAL.GetSeasonManager():IsWinter() then
-						prefab = "icehound"
-					else
-						prefab = "firehound"
-					end
-				end		
-			end
-			
+            -- If hounds...maybe have some fire or ice
+            if prefab == "hound" then 
+                if math.random() < specialMobChance then
+                    if GLOBAL.GetSeasonManager():IsWinter() then
+                        prefab = "icehound"
+                    else
+                        prefab = "firehound"
+                    end
+                end     
+            end
             
-            -- This is nearby lightning...not a bolt. Don't want to make
-            -- them all charged (unless that would be fun...)
+			-- They spawn from lightning!
             if prefab == "lightninggoat" then
                 GLOBAL.GetSeasonManager():DoMediumLightning()
             end
-            			
-			local day = GLOBAL.GetClock().numcycles
-		            
-			local theMob = GLOBAL.SpawnPrefab(prefab)
-			if theMob then
+                        
+			-- This was in the original hounded...though it seems unused
+            local day = GLOBAL.GetClock().numcycles
+                    
+            local theMob = GLOBAL.SpawnPrefab(prefab)
+            if theMob then
                 -- This fcn will add it to our list and put a bunch of stuff on it
                 self:AddMob(theMob)
 
@@ -470,8 +469,8 @@ local function releaseRandomMobs(self)
                     end
                 end
                 
-				
-				-- If lightning goat...give it a chance to get struck by lightning
+                
+                -- If lightning goat...give it a chance to get struck by lightning
                 local exciteGoat = function(self)
                     local goatPos = Vector3(self.Transform:GetWorldPosition())
                     GLOBAL.GetSeasonManager():DoLightningStrike(goatPos)
@@ -479,27 +478,73 @@ local function releaseRandomMobs(self)
                 if theMob:HasTag("lightninggoat") and math.random() < (.9*specialMobChance) then
                     theMob:DoTaskInTime(math.max(5,10*math.random()),exciteGoat)
                 end
+				
+				-- TODO: Check player sanity. If insane, set a condition to change these monsters into
+				--       shadow creatures!
+				local transformToShadow = function(self)
+					-- Only do this once we get close enough for dramatic effect	
+					local currentPos = Vector3(self.Transform:GetWorldPosition())
+					local playerPos = Vector3(GLOBAL.GetPlayer().Transform:GetWorldPosition())
+					if currentPos ~= nil and playerPos ~= nil then
+						local currentDist = GLOBAL.distsq(currentPos,playerPos)
+						if currentDist <= 50 then
+							-- Don't turn every single one into a shadow dude...
+							local index = getIndexByName(theMob.prefab)
+							local mult = MOB_LIST[index].mobMult or 1
+							local meanOne = math.random() < (1/(mult*mult))+.15
+							if meanOne then
+								shadowDude = GLOBAL.SpawnPrefab("crawlinghorror")
+								shadowDude.components.combat:SuggestTarget(GLOBAL.GetPlayer())
+								shadowDude.Physics:Teleport(currentPos:Get())
+							else
+								shadowDude = GLOBAL.SpawnPrefab("shadowskittish")
+								shadowDude.Transform:SetPosition(currentPos:Get())
+							end
+							
+							shadowDude.previousPrefab = self.prefab
+							self:Remove()
+							
+							-- TODO...should probably set a periodic task to turn them back
+							-- when not insane :P
+						else
+							-- Check again (only if player is still crazy)
+							if GLOBAL.GetPlayer().components.sanity:IsSane() then
+								self.AnimState:SetMultColour(1,1,1,1)
+								self.task:Cancel()
+								self.task = nil
+								
+							else
+								-- Flicker
+								local black = math.max(.15,math.random()*.5)
+								--self.AnimState:SetMultColour(black,black,black,math.random()*.5)
+								self.AnimState:SetMultColour(0,0,0,math.max(.3,math.random()*.5))
+							end
+						end
+					end
+					
+				end
+				if GLOBAL.GetPlayer().components.sanity and GLOBAL.GetPlayer().components.sanity:IsCrazy() then
+					theMob.task = theMob:DoPeriodicTask(.15,transformToShadow)
+				end
                 
-				theMob.Physics:Teleport(spawn_pt:Get())
-				theMob:FacePoint(pt)
+                theMob.Physics:Teleport(spawn_pt:Get())
+                theMob:FacePoint(pt)
                 
                 -- Stuff to do after all of the mobs are released
                 if self.houndstorelease == 0 then
-				
+                
                     -- Transform the pigs to werepigs
                     if theMob:HasTag("SpecialPigman") and math.random() < (1.2*specialMobChance) then
                         self.inst:DoTaskInTime(5, function(inst) transformThings() end)
                     end
-                    
                 end
-                
-			end
-		end
-		
+            end -- if theMob
+        end -- spawn_pt
+        
         self.calcNextReleaseTime = (self.houndstorelease > 0)
-	end
-	self.ReleaseHound = ReleasePrefab
-	
+    end
+    self.ReleaseHound = ReleasePrefab
+    
 
     local origPlanFunction = self.PlanNextHoundAttack
     local function planNextAttack(self, prefabIndex)
@@ -514,7 +559,7 @@ local function releaseRandomMobs(self)
         end
 
         self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[self.currentIndex].mobMult)
-		print("Next Attack: " .. self.houndstorelease .. " " .. MOB_LIST[self.currentIndex].prefab)
+        print("Next Attack: " .. self.houndstorelease .. " " .. MOB_LIST[self.currentIndex].prefab)
         updateWarningString(self.currentIndex)
         
         -- Reset the warning counter
@@ -555,70 +600,66 @@ local function releaseRandomMobs(self)
                 -- Camera shake decreases in intensity as it goes on...but I want it to INCREASE!!
                 self.quakeMachine:DoTaskInTime(1*interval, function(self) self:WarnQuake(interval*2, .02, .1) end)
                 self.quakeMachine:DoTaskInTime(2*interval, function(self) self:WarnQuake(interval*2, .025, .1) end)
-
                 self.quakeMachine.quakeStarted = true
                 
                 local interval = self.timetoattack/5
                 for i=1, 5 do
                     self.quakeMachine:DoTaskInTime(i*interval, function(self) self:MakeStampedeLouder() end)
                 end
-				
-				-- Schedule quake to end
-				self.quakeMachine:DoTaskInTime(self.timetoattack+5, function(self) self:EndQuake() end)
+                
+                -- Schedule quake to end
+                self.quakeMachine:DoTaskInTime(self.timetoattack+5, function(self) self:EndQuake() end)
             end
         -- If lightning goats are coming, start some weather effects
         elseif MOB_LIST[self.currentIndex].prefab == "lightninggoat" then
             if self.timetoattack < self.warnduration and self.timetoattack > 0 and not self.inst.overcastStarted then
-								
+                                
                 -- We're in the warning interval. Lets make some clouds (only if it's day)
                 self.inst.overcastStarted = true
                 if GLOBAL.GetClock():IsDay() then
                     self.inst.startColor = GLOBAL.GetClock().currentColour
-					print(self.inst.startColor)
-					
-					-- Get the curent cloud cover
-					currentClouds = GLOBAL.GetSeasonManager():GetWeatherLightPercent()
-					
-					-- If there is more than 50% cloud cover...don't make it even darker!
-					if (1-currentClouds) < .5 then
-					
-						-- The clock uses the absolute day color already. Don't need to 
-						-- adjust to this. Just adjusting initially so we don't make it flash brighter, THEN
-						-- get darker. Instead, start at current cloud cover and add MORE!
+                    print(self.inst.startColor)
+                    
+                    -- Get the curent cloud cover
+                    currentClouds = GLOBAL.GetSeasonManager():GetWeatherLightPercent()
+                    
+                    -- If there is more than 50% cloud cover...don't make it even darker!
+                    if (1-currentClouds) < .5 then
+                    
+                        -- The clock uses the absolute day color already. Don't need to 
+                        -- adjust to this. Just adjusting initially so we don't make it flash brighter, THEN
+                        -- get darker. Instead, start at current cloud cover and add MORE!
 
-						-- Make some (more) clouds! These are supposed to be ominous!
-						self.inst.endColor = GLOBAL.Point(0,0,0)
-						self.inst.endColor.x = .5*currentClouds*self.inst.startColor.x
-						self.inst.endColor.y = .5*currentClouds*self.inst.startColor.y
-						self.inst.endColor.z = .5*currentClouds*self.inst.startColor.z
+                        -- Make some (more) clouds! These are supposed to be ominous!
+                        self.inst.endColor = GLOBAL.Point(0,0,0)
+                        self.inst.endColor.x = .5*currentClouds*self.inst.startColor.x
+                        self.inst.endColor.y = .5*currentClouds*self.inst.startColor.y
+                        self.inst.endColor.z = .5*currentClouds*self.inst.startColor.z
 
-						
-						-- Make it darker
-						GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-8)
-						
-						local makeCloudsGoAway = function(self)
-							-- Don't fix the color if it went to dusk as that would break the color
-							if GLOBAL.GetClock():IsDay() then
-								GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
-							end
-							self.overcastStarted = false
-						end
-						-- When done...transition back to normal color
-						local cloudTime = 8*(self.houndstorelease+1) + self.timetoattack
-						self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
-					end
+                        
+                        -- Make it darker
+                        GLOBAL.GetClock():LerpAmbientColour(self.inst.startColor, self.inst.endColor, self.timetoattack-8)
+                        
+                        local makeCloudsGoAway = function(self)
+                            -- Don't fix the color if it went to dusk as that would break the color
+                            if GLOBAL.GetClock():IsDay() then
+                                GLOBAL.GetClock():LerpAmbientColour(self.endColor,self.startColor,3)
+                            end
+                            self.overcastStarted = false
+                        end
+                        -- When done...transition back to normal color
+                        local cloudTime = 8*(self.houndstorelease+1) + self.timetoattack
+                        self.inst:DoTaskInTime(cloudTime, makeCloudsGoAway)
+                    end
                 end
                 
-                -- Schedule some distant thunder
+                -- Schedule some distant thunder sound fx
                 local interval = self.timetoattack/6
-
                 for i=1,5 do
                     self.inst:DoTaskInTime(i*interval*(math.random()+1), function(self) 
                             GLOBAL.GetPlayer().SoundEmitter:PlaySound("dontstarve/rain/thunder_far","far_thunder") 
                             GLOBAL.GetPlayer().SoundEmitter:SetParameter("far_thunder", "intensity", .02*i) end)
-                            
                 end
-                
             end
         end
         
@@ -656,8 +697,8 @@ local function releaseRandomMobs(self)
         if self.currentIndex == nil then
             print("Could not load index. Planning next attack")
             self:PlanNextHoundAttack()
-		else
-			updateWarningString(self.currentIndex)
+        else
+            updateWarningString(self.currentIndex)
         end
     end
     self.OnLoad = newOnLoad
@@ -719,18 +760,18 @@ local function MakeMobChasePlayer(brain)
     --[[ Make this the top of the priority node. Basically, if they have the 
          insane tag (we add it above), they will prioritize chasing and attempting 
          to kill the player before doing normal things.
-		 
-		 Update - maybe should make all mobs attack walls now since they are crazy
+         
+         Update - maybe should make all mobs attack walls now since they are crazy
     --]]
 
     local function KillKillDieDie(inst)
-		-- Chase for 60 seconds, target distance 60
+        -- Chase for 60 seconds, target distance 60
         return GLOBAL.ChaseAndAttack(inst,60,60)
     end
     
-	attackWall = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Get The Coward", GLOBAL.AttackWall(brain.inst) )
+    attackWall = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Get The Coward", GLOBAL.AttackWall(brain.inst) )
     chaseAndKill = GLOBAL.WhileNode(function() return brain.inst:HasTag("houndedKiller") end, "Kill Kill", KillKillDieDie(brain.inst))
-	
+    
     
     -- Find the root node. Insert this WhileNode at the top.
     -- Well, we'll put it after "OnFire" (if it exists) so it will still panic if on fire
@@ -742,41 +783,41 @@ local function MakeMobChasePlayer(brain)
     end
        
     -- Tell the brain "Attack the player...unless there is a wall in the way, get that instead"
-	table.insert(brain.bt.root.children, fireindex+1, chaseAndKill)
-	table.insert(brain.bt.root.children, fireindex+1, attackWall)
+    table.insert(brain.bt.root.children, fireindex+1, chaseAndKill)
+    table.insert(brain.bt.root.children, fireindex+1, attackWall)
 
     
     -- The plan was to give the players a small break by having the mobs stop for a snack...but they don't 
-	-- ever seem to want to to id. TODO!
-	-- Make the mobs have a snack every so often
-	local function EatFoodAction(inst)
-		if inst.components.eater then
-			local target = GLOBAL.FindEntity(inst, 30, function(item) return inst.components.eater:CanEat(item) and item:IsOnValidGround() end)
-			if target then
-				return GLOBAL.BufferedAction(inst, target, GLOBAL.ACTIONS.EAT)
-			end
-		end
-	end
-	haveASnack = GLOBAL.DoAction(brain.inst, EatFoodAction, "Eat Food", true )
-	
-	-- If the brain already has this...don't add it again. Else, add it to the end
+    -- ever seem to want to to id. TODO!
+    -- Make the mobs have a snack every so often
+    local function EatFoodAction(inst)
+        if inst.components.eater then
+            local target = GLOBAL.FindEntity(inst, 30, function(item) return inst.components.eater:CanEat(item) and item:IsOnValidGround() end)
+            if target then
+                return GLOBAL.BufferedAction(inst, target, GLOBAL.ACTIONS.EAT)
+            end
+        end
+    end
+    haveASnack = GLOBAL.DoAction(brain.inst, EatFoodAction, "Eat Food", true )
+    
+    -- If the brain already has this...don't add it again. Else, add it to the end
     local hasAction = false
     for i,node in ipairs(brain.bt.root.children) do
         if node.name == "Parallel" and node.children[1].name == "Eat Food" then
-			-- Already eats...don't add it again
+            -- Already eats...don't add it again
             hasAction = true
             break
         end
     end
-	
-	-- TODO: Fix snack code
-	if false then
-		if not hasAction then
-			-- Just insert at end
-			table.insert(brain.bt.root.children, haveASnack)
-		end
-	end
-	
+    
+    -- TODO: Fix snack code
+    if false then
+        if not hasAction then
+            -- Just insert at end
+            table.insert(brain.bt.root.children, haveASnack)
+        end
+    end
+    
     -- Debug string to see that my KillKillDieDie was added
     --print("Brain for " .. tostring(brain.inst.name))
     --for i,node in ipairs(brain.bt.root.children) do
@@ -801,6 +842,7 @@ end
 -- Generate a new special hound effect if this has never been loaded before
 ---------------------------------------------------------------------------
 local function firstTimeLoad()
+
 	-- Don't load anything if in a cave
 	if not GLOBAL.GetWorld():IsCave() then
 		if GLOBAL.GetWorld().components.hounded.currentIndex == nil then
