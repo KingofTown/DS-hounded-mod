@@ -855,3 +855,15 @@ local function firstTimeLoad()
 end
 AddSimPostInit(function() firstTimeLoad() end)
 
+-- Don't increase naughtyness for killing things that are coming right for you
+local removedNaughty = function(self)
+    local origFcn = self.onkilledother
+    local newKillFcn = function(self,victim)
+        if not victim:HasTag("houndedKiller") then
+            origFcn(self,victim)
+        end
+    end
+	self.onkilledother = newKillFcn
+ end
+ AddComponentPostInit("kramped",removedNaughty)
+
