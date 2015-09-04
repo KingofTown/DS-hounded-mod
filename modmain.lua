@@ -15,9 +15,7 @@ local SEASONS = GLOBAL.SEASONS
         damageMult: how much damage it does compared to normal mob
         healthMult: how much health it has compared to its normal self
 		dropMult: Modify the odds to drop something. This reduces every item in the drop table by this percent.
-        
-        TODO: Have health defined here? It's a bit much fighing one of these sometimes...multiple seems impossible
-        
+                
 --]]
 
 local MOB_LIST =
