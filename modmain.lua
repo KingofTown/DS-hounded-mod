@@ -20,21 +20,22 @@ local SEASONS = GLOBAL.SEASONS
 
 local MOB_LIST =
 {
-    [1]  = {enabled=true,prefab="hound",mobMult=1,timeMult=1},
-    [2]  = {enabled=true,prefab="merm",brain="mermbrain",mobMult=1,timeMult=1},
+    [1]  = {enabled=true,prefab="hound",timeMult=1},
+    [2]  = {enabled=true,prefab="merm",brain="mermbrain",timeMult=1},
     [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=.75,timeMult=1.2},
-    [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
+    [4]  = {enabled=true,prefab="pigman",brain="pigbrain",timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
     [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3,dropMult=.8},
     [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,timeMult=.13,damageMult=2.2,dropMult=.5},
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
-    [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1}, -- TODO: Bats crash game when attacked by other things.
-    [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, -- These dudes don't work too well (mostly works, but they get lost)
-    [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5,dropMult=.4}, -- Only drop half of the time
-    [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},mobMult=1,timeMult=1}, -- Needs work. They wont get enraged. Also spawns moosegoose....so yeah
+    [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",timeMult=1}, -- TODO: Bats crash game when attacked by other things.
+    [11] = {enabled=false,prefab="rook",brain="rookbrain",timeMult=1}, -- These dudes don't work too well (mostly works, but they get lost)
+    [12] = {enabled=true,prefab="knight",brain="knightbrain",timeMult=1.5,dropMult=.4}, -- Only drop half of the time
+    [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},timeMult=1}, -- Needs work. They wont get enraged. Also spawns moosegoose....so yeah
     [14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25,dropMult=.4},
     [15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,timeMult=.35,damageMult=.5},
+	[16] = {enabled=true,prefab="walrus",brain="walrusbrain",Season={SEASONS.WINTER},mobMult=.33, timeMult=3}
 }
 
 -- Lookup the table index by prefab name. Returns nil if not found
@@ -131,6 +132,8 @@ local function updateWarningString(index)
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Gobbles!!!"
     elseif prefab == "penguin" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh no...they think I took their eggs!"
+	elseif prefab == "walrus" then
+		STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "The hunter becomes the hunted"
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
@@ -266,6 +269,11 @@ local function releaseRandomMobs(self)
             if mob.components.homeseeker then
                 mob:RemoveComponent("homeseeker")
             end
+			
+			-- Just to be sure...
+            if mob.components.knownlocations then
+                mob.components.knownlocations:ForgetLocation("home")
+            end
             
             -- Can't remove 'sleeper' tag as it causes the entity to throw errors. Just
             -- override the ShouldSleep functions
@@ -294,17 +302,6 @@ local function releaseRandomMobs(self)
             -- Pigs might transform! Hmm, beardbunny dudes are werebeasts too
             if mob.components.werebeast ~= nil then
                 mob:AddTag("SpecialPigman")
-            end
-            
-            -- Quit trying to find a herd dumb mobs
-               -- or not...some prefabs kind of assume this is set
-            --if mob.components.herdmember then
-            --    mob:RemoveComponent("herdmember")
-            --end
-            
-            -- Quit trying to go home. Your home is the afterlife.
-            if mob.components.knownlocations then
-                mob.components.knownlocations:ForgetLocation("home")
             end
             
             -- Override the default KeepTarget for this mob.
@@ -382,7 +379,6 @@ local function releaseRandomMobs(self)
 					end
 				end
 			end
-            
             ------------------------------------------------------------------------------
         end
     end -- end AddMob fcn
@@ -483,6 +479,7 @@ local function releaseRandomMobs(self)
 
                 -- This is stuff that happens when spawning (not onLoad). 
 
+				---------------------------------------------------------------------
                 -- Mosquitos should have a random fill rate instead of all being at 0
                 if theMob:HasTag("mosquito") then
                     local fillUp = math.random(0,2)
@@ -491,7 +488,7 @@ local function releaseRandomMobs(self)
                     end
                 end
                 
-                
+                ----------------------------------------------------------------------
                 -- If lightning goat...give it a chance to get struck by lightning
                 local exciteGoat = function(self)
                     local goatPos = Vector3(self.Transform:GetWorldPosition())
@@ -501,8 +498,30 @@ local function releaseRandomMobs(self)
                     theMob:DoTaskInTime(math.max(5,10*math.random()),exciteGoat)
                 end
 				
-				-- TODO: Check player sanity. If insane, set a condition to change these monsters into
-				--       shadow creatures!
+				-----------------------------------------------------------------------
+				-- Hunting party is here! Make some friends! Assume the kids don't come.
+				if theMob.prefab == "walrus" then
+					local numHounds = 2
+					local leader = theMob
+					for i=1,numHounds do
+						print("Releasing pet hound")
+						hound = GLOBAL.SpawnPrefab("icehound")
+						if hound then
+							-- TODO: These won't persist as followers...
+							self:AddMob(hound)
+							hound:AddTag("pet_hound")
+							hound.Transform:SetPosition(spawn_pt:Get())
+							if not hound.components.follower then
+								hound:AddComponent("follower")
+							end
+							hound.components.follower:SetLeader(leader)
+							hound:FacePoint(pt)
+						end
+					end
+				end
+				
+				------------------------------------------------------------------------
+				-- Make them shadow dudes instead
 				local transformToShadow = function(self)
 					-- Only do this once we get close enough for dramatic effect	
 					local currentPos = Vector3(self.Transform:GetWorldPosition())
@@ -546,7 +565,10 @@ local function releaseRandomMobs(self)
 					
 				end
 				if GLOBAL.GetPlayer().components.sanity and GLOBAL.GetPlayer().components.sanity:IsCrazy() then
-					theMob.task = theMob:DoPeriodicTask(.15,transformToShadow)
+					-- TODO: Make this a bit cleaner so it doesn't get out of control...
+					if theMob.prefab ~= "walrus" then
+						theMob.task = theMob:DoPeriodicTask(.15,transformToShadow)
+					end
 				end
                 
                 theMob.Physics:Teleport(spawn_pt:Get())
@@ -580,7 +602,12 @@ local function releaseRandomMobs(self)
             self.currentIndex = getRandomMob()
         end
 
-        self.houndstorelease = math.floor(self.houndstorelease*MOB_LIST[self.currentIndex].mobMult)
+		local mult = MOB_LIST[self.currentIndex].mobMult or 1
+		-- Always spawn at least 1
+        local numHounds = math.max(1,self.houndstorelease*mult)
+		print("numHounds: " .. numHounds)
+		-- Round to nearest int
+		self.houndstorelease = numHounds % 1 >= .5 and math.ceil(numHounds) or math.floor(numHounds)
         print("Next Attack: " .. self.houndstorelease .. " " .. MOB_LIST[self.currentIndex].prefab)
         updateWarningString(self.currentIndex)
         
@@ -601,9 +628,10 @@ local function releaseRandomMobs(self)
         local didWarnSecond = self.announcewarningsoundinterval
         -- Modify the next release time based on the current prefab
         if self.timetoattack <= 0 then
-            if MOB_LIST[self.currentIndex].timeMult ~= 1 and self.calcNextReleaseTime then
+			local timeMult = MOB_LIST[self.currentIndex].timeMult or 1
+            if timeMult ~= 1 and self.calcNextReleaseTime then
                 local orig = self.timetonexthound
-                self.timetonexthound = self.timetonexthound * MOB_LIST[self.currentIndex].timeMult
+                self.timetonexthound = self.timetonexthound * timeMult
                 self.calcNextReleaseTime = false
             end
             
