@@ -14,6 +14,7 @@ local SEASONS = GLOBAL.SEASONS
         timeMult: how fast these come out compared to normal hounds. 0.5 is twice as fast. 2 is half speed.
         damageMult: how much damage it does compared to normal mob
         healthMult: how much health it has compared to its normal self
+		dropMult: Modify the odds to drop something. This reduces every item in the drop table by this percent.
         
         TODO: Have health defined here? It's a bit much fighing one of these sometimes...multiple seems impossible
         
@@ -26,15 +27,15 @@ local MOB_LIST =
     [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=.75,timeMult=1.2},
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",mobMult=1,timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
-    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,timeMult=.13,damageMult=2.2},
+    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3,dropMult=.8},
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,timeMult=.13,damageMult=2.2,dropMult=.5},
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
     [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",mobMult=1,timeMult=1}, -- TODO: Bats crash game when attacked by other things.
     [11] = {enabled=false,prefab="rook",brain="rookbrain",mobMult=1,timeMult=1}, -- These dudes don't work too well (mostly works, but they get lost)
-    [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5}, 
+    [12] = {enabled=true,prefab="knight",brain="knightbrain",mobMult=1,timeMult=1.5,dropMult=.4}, -- Only drop half of the time
     [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},mobMult=1,timeMult=1}, -- Needs work. They wont get enraged. Also spawns moosegoose....so yeah
-    [14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25},
+    [14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25,dropMult=.4},
     [15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,timeMult=.35,damageMult=.5},
 }
 
@@ -360,6 +361,29 @@ local function releaseRandomMobs(self)
                 local mult = MOB_LIST[index].healthMult
                 mob.components.health:SetMaxHealth(mult*mob.components.health.maxhealth)
             end
+			
+			-- Tweak the drop rates for the mobs
+			if index and MOB_LIST[index].dropMult then
+				local mult = MOB_LIST[index].dropMult
+				if mob.components.lootdropper.loot then
+					local current_loot = mob.components.lootdropper.loot
+					mob.components.lootdropper:SetLoot(nil)
+					-- Create a loot_table from this (chance would be 1)
+					for k,v in pairs(current_loot) do
+						mob.components.lootdropper:AddChanceLoot(v,mult)
+					end			
+				elseif mob.components.lootdropper.chanceloottable then
+					local loot_table = GLOBAL.LootTables[mob.components.lootdropper.chanceloottable]
+					if loot_table then
+					mob.components.lootdropper:SetChanceLootTable(nil)
+						for i,entry in pairs(loot_table) do
+							local prefab = entry[1]
+							local chance = entry[2]*mult
+							mob.components.lootdropper:AddChanceLoot(prefab,chance)
+						end
+					end
+				end
+			end
             
             ------------------------------------------------------------------------------
         end
@@ -742,19 +766,18 @@ local function transformFcn(inst)
     end
 end
 
--------------------------------------------------
+---------------------------------------------------------------------------
 -- PIGMAN override to add listen event
--------------------------------------------------
+---------------------------------------------------------------------------
 local function AddPigmanTransformEvent(inst)
     inst:ListenForEvent("transform_special_pigs",transformFcn)
 end
 
 AddPrefabPostInit("pigman",AddPigmanTransformEvent)
 
---------------------------------------------------
+---------------------------------------------------------------------------
 -- Brain Modifications
---------------------------------------------------
-
+---------------------------------------------------------------------------
 local ipairs = GLOBAL.ipairs
 local function MakeMobChasePlayer(brain)
     --[[ Make this the top of the priority node. Basically, if they have the 
@@ -855,7 +878,9 @@ local function firstTimeLoad()
 end
 AddSimPostInit(function() firstTimeLoad() end)
 
--- Don't increase naughtyness for killing things that are coming right for you
+---------------------------------------------------------------------------
+-- Don't increase naughtyness for killing these things
+---------------------------------------------------------------------------
 local removedNaughty = function(self)
     local origFcn = self.onkilledother
     local newKillFcn = function(self,victim)
