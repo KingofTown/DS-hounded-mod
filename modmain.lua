@@ -21,21 +21,21 @@ local SEASONS = GLOBAL.SEASONS
 local MOB_LIST =
 {
     [1]  = {enabled=true,prefab="hound",timeMult=1},
-    [2]  = {enabled=true,prefab="merm",brain="mermbrain",timeMult=1},
+    [2]  = {enabled=true,prefab="merm",brain="mermbrain",mobMult=.75,timeMult=1.2},
     [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=.75,timeMult=1.2},
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
-    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,timeMult=.3,dropMult=.8},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,timeMult=.13,damageMult=2.2,dropMult=.5},
+    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,maxMob=14,timeMult=.3,dropMult=.8},
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,maxMob=15,timeMult=.13,damageMult=2.2,dropMult=.5},
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
     [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",timeMult=1}, -- TODO: Bats crash game when attacked by other things.
     [11] = {enabled=false,prefab="rook",brain="rookbrain",timeMult=1}, -- These dudes don't work too well (mostly works, but they get lost)
     [12] = {enabled=true,prefab="knight",brain="knightbrain",timeMult=1.5,dropMult=.4}, -- Only drop half of the time
     [13] = {enabled=false,prefab="mossling",brain="mosslingbrain",RoG=true,Season={SEASONS.SPRING},timeMult=1}, -- Needs work. They wont get enraged. Also spawns moosegoose....so yeah
-    [14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,timeMult=.25,dropMult=.4},
-    [15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,timeMult=.35,damageMult=.5},
-	[16] = {enabled=true,prefab="walrus",brain="walrusbrain",Season={SEASONS.WINTER},mobMult=.33, timeMult=3}
+    [14] = {enabled=true,prefab="perd",brain="perdbrain",mobMult=2.5,maxMob=15,timeMult=.25,dropMult=.4},
+    [15] = {enabled=true,prefab="penguin",brain="penguinbrain",Season={SEASONS.WINTER},mobMult=2.5,maxMob=15,timeMult=.35,damageMult=.5},
+	 [16] = {enabled=true,prefab="walrus",brain="walrusbrain",Season={SEASONS.WINTER},mobMult=.33, timeMult=3}
 }
 
 -- Lookup the table index by prefab name. Returns nil if not found
@@ -233,6 +233,67 @@ local function transformThings(inst)
     end
 end
 
+-- Transforms a mob to an ice/fire version.
+-- Copies the ice/fire hound ondeath and gives
+-- a special drop. 
+-- Also changes the color.
+local function makeMobSpecial(theMob, specialStats)
+
+   -- Increase damage and decrease health
+   local health = theMob.components.health:GetMaxHealth()
+   theMob.components.health:SetMaxHealth(health*.66)
+   
+   local damage = theMob.components.combat.defaultdamage
+   theMob.components.combat:SetDefaultDamage(damage*1.35)
+   
+   -- Add onDeath triggers
+   if specialStats == "ice" then
+      theMob.AnimState:SetMultColour(.75,.75,1,1)
+      theMob:ListenForEvent("death", function(inst)
+      
+           -- Base game freeze hounds didn't freeze anything...strange
+           if dlcEnabled then
+              if not inst.components.freezable then
+                  -- Eh...it won't be there long enough to show this. This is
+                  -- just to set up the FX.
+                  GLOBAL.MakeMediumFreezableCharacter(inst, "hound_body")
+              end
+              inst.components.freezable:SpawnShatterFX()
+              inst:RemoveComponent("freezable")
+              local x,y,z = inst.Transform:GetWorldPosition()
+              local ents = GLOBAL.TheSim:FindEntities(x, y, z, 4, {"freezable"}, {"FX", "NOCLICK","DECOR","INLIMBO"}) 
+              for i,v in pairs(ents) do
+                  if v.components.freezable then
+                      v.components.freezable:AddColdness(2)
+                  end
+              end
+           end
+           
+           -- Also drop a gem!
+           if math.random() < .3 then
+              inst.components.lootdropper:SpawnLootPrefab("bluegem")
+           end
+   
+           inst.SoundEmitter:PlaySound("dontstarve/creatures/hound/icehound_explo", "explosion")
+      end)
+   else
+      theMob.AnimState:SetMultColour(1,.5,.5,1)
+      theMob:ListenForEvent("death", function(inst)
+         if math.random() < .3 then
+            inst.components.lootdropper:SpawnLootPrefab("redgem")
+         end
+         
+         -- Make some fire!
+         for k=1,3 do
+            inst.components.lootdropper:SpawnLootPrefab("houndfire")
+         end
+         
+         inst.SoundEmitter:PlaySound("dontstarve/creatures/hound/firehound_explo", "explosion")
+      
+      end)
+   end
+end
+
 
 local function releaseRandomMobs(self)
     self.quakeMachine = GLOBAL.CreateEntity()
@@ -245,6 +306,12 @@ local function releaseRandomMobs(self)
     -- I guess we have to store these mobs that we can tag them onLoad
     self.currentMobs = {}
     self.numMobsSpawned = 0
+	
+	self.PrintMobList = function(self)
+		for k,v in pairs(self.currentMobs) do
+			print(k,v)
+		end
+	end
 
     self.AddMob = function(self,mob)
         if self.currentMobs[mob] == nil and mob then
@@ -446,23 +513,31 @@ local function releaseRandomMobs(self)
             end
             
             -- Increase chances of special mobs later on
-            local specialMobChance = self:GetSpecialHoundChance()
+            local specialMobChance = self.debugSpawn and 1 or self:GetSpecialHoundChance()
             
             -- If spiders...give a chance at warrior spiders
             if prefab == "spider" and math.random() < specialMobChance then
                 prefab = "spider_warrior"
             end
 
-            -- If hounds...maybe have some fire or ice
-            if prefab == "hound" then 
-                if math.random() < specialMobChance then
-                    if GLOBAL.GetSeasonManager():IsWinter() then
-                        prefab = "icehound"
-                    else
-                        prefab = "firehound"
-                    end
-                end     
-            end
+          -- Make fire/ice versions of all hounds!
+          local specialStats = nil
+          if math.random() < specialMobChance then
+              if GLOBAL.GetSeasonManager():IsWinter() then
+                  if prefab == "hound" then
+                     prefab = "icehound"
+                  else
+                     specialStats = "ice"
+                  end
+              else
+                  if prefab == "hound" then
+                     prefab = "firehound"
+                  else
+                     specialStats = "fire"
+                  end
+              end
+          end         
+
             
 			-- They spawn from lightning!
             if prefab == "lightninggoat" then
@@ -476,6 +551,10 @@ local function releaseRandomMobs(self)
             if theMob then
                 -- This fcn will add it to our list and put a bunch of stuff on it
                 self:AddMob(theMob)
+                
+                if specialStats then
+                  makeMobSpecial(theMob,specialStats)
+                end
 
                 -- This is stuff that happens when spawning (not onLoad). 
 
@@ -603,8 +682,13 @@ local function releaseRandomMobs(self)
         end
 
 		local mult = MOB_LIST[self.currentIndex].mobMult or 1
+		local max = MOB_LIST[self.currentIndex].maxMob or nil
 		-- Always spawn at least 1
-        local numHounds = math.max(1,self.houndstorelease*mult)
+      local numHounds = math.max(1,self.houndstorelease*mult)
+      if max then
+         numHounds = math.max(max,numHounds)
+      end
+      
 		print("numHounds: " .. numHounds)
 		-- Round to nearest int
 		self.houndstorelease = numHounds % 1 >= .5 and math.ceil(numHounds) or math.floor(numHounds)
