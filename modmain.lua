@@ -25,8 +25,8 @@ local MOB_LIST =
     [3]  = {enabled=true,prefab="tallbird",brain="tallbirdbrain",mobMult=.75,timeMult=1.2},
     [4]  = {enabled=true,prefab="pigman",brain="pigbrain",timeMult=1},
     [5]  = {enabled=true,prefab="spider",brain="spiderbrain",mobMult=1.7,timeMult=.5},
-    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,maxMob=14,timeMult=.3,dropMult=.8},
-    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,maxMob=15,timeMult=.13,damageMult=2.2,dropMult=.5},
+    [6]  = {enabled=true,prefab="killerbee",brain="killerbeebrain",mobMult=2.2,maxMob=15,timeMult=.25,dropMult=.8},
+    [7]  = {enabled=true,prefab="mosquito",brain="mosquitobrain",mobMult=2.75,maxMob=18,timeMult=.13,damageMult=2.2,dropMult=.5},
     [8]  = {enabled=true,prefab="lightninggoat",brain="lightninggoatbrain",RoG=true,mobMult=.75,timeMult=1.25}, 
     [9]  = {enabled=true,prefab="beefalo",brain="beefalobrain",mobMult=.75,timeMult=1.5},
     [10] = {enabled=false,prefab="bat",brain="batbrain",CaveState="open",timeMult=1}, -- TODO: Bats crash game when attacked by other things.
@@ -522,7 +522,11 @@ local function releaseRandomMobs(self)
 
           -- Make fire/ice versions of all hounds!
           local specialStats = nil
-          if math.random() < specialMobChance then
+          
+          -- Adjust the special mob chance by the number of mobs there are.
+          -- 2x more mobs should have a 50% chance compared to normal, etc.
+          local chanceMod = MOB_LIST[self.currentIndex].mobMult or 1
+          if math.random() < specialMobChance/chanceMod then
               if GLOBAL.GetSeasonManager():IsWinter() then
                   if prefab == "hound" then
                      prefab = "icehound"
