@@ -104,19 +104,19 @@ local function updateWarningString(index)
     if prefab == nil then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     elseif prefab == "merm" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh god, it smells like rotting fish"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh god, it smells like rotting fish."
     elseif prefab == "spider" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a million tiny legs"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a million tiny legs."
     elseif prefab == "tallbird" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a murder...of tall birds"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Sounds like a murder...of tall birds."
     elseif prefab == "pigman" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Was that an oink?"
     elseif prefab == "killerbee" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Beeeeeeeeeeeeeeeeees!"
     elseif prefab == "mosquito" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "I hear a million teeny tiny vampires"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "I hear a million teeny tiny vampires."
     elseif prefab == "lightninggoat" then
-        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Those giant dark clouds look ominous"
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Those giant dark clouds look ominous."
     elseif prefab == "beefalo" then
         if warningCount == 1 then
             STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Earthquake?!?"
@@ -133,7 +133,7 @@ local function updateWarningString(index)
     elseif prefab == "penguin" then
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "Oh no...they think I took their eggs!"
 	elseif prefab == "walrus" then
-		STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "The hunter becomes the hunted"
+		STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = "The hunter becomes the hunted."
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
