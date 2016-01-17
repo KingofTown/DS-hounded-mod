@@ -137,6 +137,10 @@ local function updateWarningString(index)
     else
         STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = defaultPhrase
     end
+    
+    if character == "WX78" then
+        STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS = string.upper(STRINGS.CHARACTERS[character].ANNOUNCE_HOUNDS)
+    end
 end
 
 
