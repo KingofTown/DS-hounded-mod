@@ -99,6 +99,12 @@ local function updateWarningString(index)
     if character == nil or character == "WILSON" then
         character = "GENERIC"
     end
+	
+	-- Wes doesn't have this defined. Other mod characters may not either.
+	if STRINGS.CHARACTERS[character] == nil then
+		return
+	end
+	
     
     prefab = MOB_LIST[index].prefab
     if prefab == nil then
